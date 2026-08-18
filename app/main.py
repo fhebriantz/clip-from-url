@@ -20,13 +20,14 @@ from .config import (
     ensure_dirs,
     setup_console,
 )
-from .tools import find_binary
+from .tools import add_bin_to_path, find_binary
 
 
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI):
     setup_console()
     ensure_dirs()
+    add_bin_to_path()
     db.init()
     worker.start()
     yield
@@ -56,6 +57,7 @@ class HighlightRequest(BaseModel):
 def health() -> dict[str, Any]:
     return {
         "ffmpeg": find_binary("ffmpeg") is not None,
+        "deno": find_binary("deno") is not None,
         "gemini_key": bool(GEMINI_API_KEY),
         "model": GEMINI_MODEL,
     }

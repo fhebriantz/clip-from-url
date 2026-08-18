@@ -17,6 +17,7 @@ async function checkHealth() {
     const h = await (await fetch("/api/health")).json();
     const parts = [];
     parts.push(h.ffmpeg ? '<span class="good">FFmpeg siap</span>' : '<span class="bad">FFmpeg hilang</span>');
+    parts.push(h.deno ? '<span class="good">Deno siap</span>' : '<span class="bad">Deno hilang (unduhan YouTube akan gagal)</span>');
     parts.push(h.gemini_key
       ? `<span class="good">${esc(h.model)}</span>`
       : '<span class="bad">GEMINI_API_KEY kosong (isi .env)</span>');

@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 from typing import Callable
 
+from google.genai import errors as genai_errors
+
 from google import genai
 from google.genai import types
 
@@ -54,6 +56,68 @@ Durasi total video ini {total} detik. Semua timestamp harus di dalam rentang itu
 
 class GeminiNotConfigured(RuntimeError):
     pass
+
+
+# Model flash populer sering menolak sementara dengan 503 saat permintaan menumpuk.
+# Video sudah terunggah pada titik ini, jadi menyerah di percobaan pertama itu mahal.
+_RETRY_CODES = {429, 500, 502, 503, 504}
+_ATTEMPTS_PER_MODEL = 3
+
+# Model flash terbaru rutin menolak dengan 503 saat permintaan menumpuk, dan
+# sesekali hilang dari katalog (404). Video sudah terunggah pada titik ini, jadi
+# lebih baik pindah model daripada menggagalkan job.
+_FALLBACKS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview"]
+
+
+def _model_chain() -> list[str]:
+    chain = [GEMINI_MODEL]
+    chain += [m for m in _FALLBACKS if m != GEMINI_MODEL]
+    return chain
+
+
+def _generate(client: genai.Client, model: str, uploaded, prompt: str) -> dict:
+    resp = client.models.generate_content(
+        model=model,
+        contents=[uploaded, prompt],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=_SCHEMA,
+            temperature=0.4,
+        ),
+    )
+    return resp.parsed or {}
+
+
+def _generate_with_retry(client: genai.Client, uploaded, prompt: str, on_status) -> dict:
+    chain = _model_chain()
+    last: Exception | None = None
+
+    for model in chain:
+        delay = 5.0
+        for attempt in range(1, _ATTEMPTS_PER_MODEL + 1):
+            try:
+                result = _generate(client, model, uploaded, prompt)
+                if model != chain[0] and on_status:
+                    on_status(f"Berhasil memakai model cadangan: {model}")
+                return result
+            except (genai_errors.ServerError, genai_errors.ClientError) as exc:
+                last = exc
+                code = getattr(exc, "code", None)
+                if code not in _RETRY_CODES:
+                    break  # 404/400 tidak akan membaik dengan menunggu
+                if attempt == _ATTEMPTS_PER_MODEL:
+                    break
+                if on_status:
+                    on_status(f"{model} sibuk ({code}), coba lagi {int(delay)}s...")
+                time.sleep(delay)
+                delay = min(delay * 2, 30.0)
+        if on_status and model != chain[-1]:
+            on_status(f"{model} tidak tersedia, pindah ke model cadangan...")
+
+    raise RuntimeError(
+        f"Semua model Gemini menolak permintaan ({', '.join(chain)}). "
+        f"Terakhir: {last}"
+    )
 
 
 def _client() -> genai.Client:
@@ -106,16 +170,7 @@ def find_highlights(
     if on_status:
         on_status("Menganalisis momen terbaik...")
     try:
-        resp = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[uploaded, prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=_SCHEMA,
-                temperature=0.4,
-            ),
-        )
-        segments = (resp.parsed or {}).get("segments", [])
+        segments = _generate_with_retry(client, uploaded, prompt, on_status).get("segments", [])
     finally:
         # Berkas di Gemini kedaluwarsa 48 jam, tapi hapus segera biar bersih.
         try:

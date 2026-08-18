@@ -21,7 +21,7 @@ DB_PATH = DATA_DIR / "app.db"
 IS_WINDOWS = sys.platform == "win32"
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
 COOKIES_FROM_BROWSER = os.getenv("YTDLP_COOKIES_FROM_BROWSER", "").strip()
 PORT = int(os.getenv("PORT", "8765"))
 
