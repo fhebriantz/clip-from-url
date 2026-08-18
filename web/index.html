@@ -13,31 +13,54 @@
 </header>
 
 <main>
-  <section class="card">
-    <h2>AI Auto-Highlighting</h2>
+  <nav class="tabs">
+    <button class="tab active" data-tab="highlight">AI Auto-Highlighting</button>
+    <button class="tab" data-tab="product">URL to Video</button>
+  </nav>
+
+  <section class="card" id="panel-highlight">
     <p class="hint">Tempel URL YouTube atau TikTok. Gemini memilih momen terbaik, FFmpeg memotongnya.</p>
-
-    <form id="form">
+    <form id="formHighlight">
       <label>URL video
-        <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required>
+        <input id="hUrl" type="url" placeholder="https://www.youtube.com/watch?v=..." required>
       </label>
-
       <div class="row">
         <label>Jumlah klip
-          <input id="count" type="number" value="3" min="1" max="10">
+          <input id="hCount" type="number" value="3" min="1" max="10">
         </label>
         <label>Durasi per klip (detik)
-          <input id="duration" type="number" value="15" min="3" max="90">
+          <input id="hDuration" type="number" value="15" min="3" max="90">
         </label>
       </div>
-
       <label class="check">
-        <input id="vertical" type="checkbox" checked>
+        <input id="hVertical" type="checkbox" checked>
         <span>Crop otomatis ke 9:16 (1080x1920)</span>
       </label>
+      <button type="submit">Proses</button>
+      <div class="error" data-err="highlight"></div>
+    </form>
+  </section>
 
-      <button id="submit" type="submit">Proses</button>
-      <div id="formError" class="error"></div>
+  <section class="card hidden" id="panel-product">
+    <p class="hint">Tempel URL produk Shopee atau Tokopedia. Gambar dan deskripsi diambil otomatis,
+      Gemini menulis naskahnya, lalu dibacakan dan disusun jadi video vertikal.</p>
+    <form id="formProduct">
+      <label>URL produk
+        <input id="pUrl" type="url" placeholder="https://shopee.co.id/product/... atau https://www.tokopedia.com/..." required>
+      </label>
+      <div class="row">
+        <label>Target durasi (detik)
+          <input id="pDuration" type="number" value="30" min="15" max="60">
+        </label>
+        <label>Suara narator
+          <select id="pVoice">
+            <option value="pria">Pria (Ardi)</option>
+            <option value="wanita">Wanita (Gadis)</option>
+          </select>
+        </label>
+      </div>
+      <button type="submit">Buat video</button>
+      <div class="error" data-err="product"></div>
     </form>
   </section>
 

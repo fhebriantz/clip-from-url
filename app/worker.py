@@ -6,7 +6,7 @@ import time
 import traceback
 
 from . import db
-from .pipeline import highlight
+from .pipeline import highlight, product_video
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -28,12 +28,13 @@ def _process(job: dict) -> None:
     job_id = job["id"]
     report = _report(job_id)
     try:
-        if job["kind"] == "highlight":
-            title = highlight.run(job_id, job["source_url"], job["params"], report, _adder(job_id))
-            db.update_job(job_id, status="done", progress=100, title=title,
-                          message="Selesai", error=None)
-        else:
+        runners = {"highlight": highlight.run, "product": product_video.run}
+        runner = runners.get(job["kind"])
+        if runner is None:
             raise RuntimeError(f"Jenis job belum didukung: {job['kind']}")
+        title = runner(job_id, job["source_url"], job["params"], report, _adder(job_id))
+        db.update_job(job_id, status="done", progress=100, title=title,
+                      message="Selesai", error=None)
     except Exception as exc:  # noqa: BLE001 - worker tidak boleh mati karena satu job
         traceback.print_exc()
         db.update_job(job_id, status="failed", message="Gagal", error=str(exc))

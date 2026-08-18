@@ -9,7 +9,7 @@ YouTube/TikTok menolak permintaan.
 | Status | Fitur | Keterangan |
 |---|---|---|
 | Siap | **AI Auto-Highlighting** | Tempel URL YouTube/TikTok, Gemini memilih momen terbaik, FFmpeg memotongnya jadi klip 9:16. |
-| Rencana | **URL-to-Video** | URL produk Shopee/Tokopedia jadi video promosi otomatis. |
+| Siap | **URL to Video** | Tempel URL produk Shopee/Tokopedia, jadi video promosi vertikal bernarasi. |
 
 ## Menjalankan
 
@@ -54,6 +54,41 @@ URL --> yt-dlp --> video sumber (maks 1080p)
 Analisis dikirim dalam resolusi 360p supaya murah dan cepat, tapi pemotongan
 selalu dilakukan dari berkas resolusi penuh.
 
+## URL to Video
+
+```
+URL produk --> ekstraksi HTML --> {judul, harga, gambar, deskripsi}
+                                            |
+                          Gemini menulis naskah (hook, scene, CTA, hashtag)
+                                            |
+                            edge-tts membacakan tiap scene (Bahasa Indonesia)
+                                            |
+        FFmpeg: background blur + produk di tengah + Ken Burns + subtitle
+                                            |
+                            gabung 9:16 --> data/output/<job>/
+```
+
+Durasi tiap scene mengikuti panjang audionya, jadi narasi tidak pernah terpotong.
+Jumlah scene dihitung dari target durasi dengan perkiraan 5 detik per scene, jadi
+hasil akhirnya bisa meleset beberapa detik.
+
+### Apa yang bisa diambil per platform
+
+| Data | Tokopedia | Shopee |
+|---|---|---|
+| Judul | ya | ya |
+| Gambar | ya | ya |
+| Deskripsi | sebagian | ya |
+| Harga | ya | **tidak langsung** |
+
+Shopee tidak merender harga di sisi server - seluruh field harganya `null` di HTML.
+Sebagai gantinya harga dicari dari teks deskripsi penjual (pola `Rp...`), yang pada
+praktiknya sering ada. Kalau tetap tidak ketemu, naskah dibuat tanpa menyebut harga
+daripada mengarang angka.
+
+Penambahan harga lewat browser otomatis sempat dicoba dan sengaja tidak dipakai:
+Chrome headless tidak pernah keluar dari proses di mesin yang dikelola JumpCloud.
+
 ## Struktur
 
 ```
@@ -62,9 +97,10 @@ app/
   worker.py      antrian job, satu thread latar
   db.py          SQLite
   tools.py       resolusi & auto-download FFmpeg
-  sources/       pengambil media (yt-dlp)
-  services/      klien Gemini
+  sources/       pengambil media (yt-dlp) dan data produk (Shopee/Tokopedia)
+  services/      klien Gemini dan text-to-speech
   pipeline/      alur per fitur
+assets/fonts/    font subtitle (Montserrat Bold, ikut dibundel)
 web/             UI (HTML/CSS/JS, tanpa build step)
 data/            database, berkas kerja, dan hasil
 ```

@@ -12,6 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from . import db, worker
+from .services import tts
+from .sources.product import UnsupportedURL, detect_source
 from .config import (
     GEMINI_API_KEY,
     GEMINI_MODEL,
@@ -53,6 +55,31 @@ class HighlightRequest(BaseModel):
         return v
 
 
+class ProductRequest(BaseModel):
+    url: str = Field(min_length=8)
+    duration: int = Field(default=30, ge=15, le=60)
+    voice: str = "pria"
+
+    @field_validator("url")
+    @classmethod
+    def _check_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("URL harus diawali http:// atau https://")
+        try:
+            detect_source(v)
+        except UnsupportedURL as exc:
+            raise ValueError(str(exc)) from exc
+        return v
+
+    @field_validator("voice")
+    @classmethod
+    def _check_voice(cls, v: str) -> str:
+        if v not in tts.VOICES:
+            raise ValueError(f"Suara harus salah satu dari: {', '.join(tts.VOICES)}")
+        return v
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     return {
@@ -76,6 +103,16 @@ def create_highlight(req: HighlightRequest) -> dict[str, str]:
             "vertical": req.vertical,
             "keep_source": req.keep_source,
         },
+    )
+    return {"job_id": job_id}
+
+
+@app.post("/api/jobs/product")
+def create_product(req: ProductRequest) -> dict[str, str]:
+    if not GEMINI_API_KEY:
+        raise HTTPException(400, "GEMINI_API_KEY belum diisi di berkas .env")
+    job_id = db.create_job(
+        "product", req.url, {"duration": req.duration, "voice": req.voice}
     )
     return {"job_id": job_id}
 

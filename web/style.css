@@ -42,6 +42,15 @@ h1 span { color: var(--muted); font-weight: 400; }
 
 main { max-width: 860px; margin: 0 auto; padding: 24px; }
 
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.tab {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 16px; font: 600 13px/1 inherit; cursor: pointer;
+}
+.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hidden { display: none; }
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -51,6 +60,11 @@ main { max-width: 860px; margin: 0 auto; padding: 24px; }
 
 .card h2 { margin: 0 0 4px; font-size: 16px; }
 .hint { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+
+select {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 10px 12px; font: inherit; width: 100%;
+}
 
 .section-title { font-size: 14px; color: var(--muted); margin: 32px 0 12px; font-weight: 600; }
 
@@ -96,6 +110,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .job-title { font-weight: 600; font-size: 14px; word-break: break-word; }
 .job-url { font-size: 12px; color: var(--muted); word-break: break-all; }
 
+.badges { display: flex; gap: 6px; flex-shrink: 0; }
+.badge.kind { color: var(--muted); }
+
 .badge {
   font-size: 11px; padding: 3px 9px; border-radius: 999px;
   border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
@@ -114,7 +131,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .clip video { width: 100%; border-radius: 6px; background: #000; display: block; }
 .clip-label { font-size: 13px; font-weight: 600; margin: 8px 0 2px; }
 .clip-meta { font-size: 11px; color: var(--muted); }
-.clip-reason { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.clip-reason { font-size: 12px; color: var(--muted); margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
 .clip a { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--accent); }
 
 .job-actions { display: flex; gap: 10px; margin-top: 12px; }
