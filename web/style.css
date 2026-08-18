@@ -1,0 +1,122 @@
+:root {
+  --bg: #0e1116;
+  --surface: #171b22;
+  --surface-2: #1f242d;
+  --border: #2b323d;
+  --text: #e6e9ef;
+  --muted: #949cab;
+  --accent: #5b8cff;
+  --ok: #3fbf7f;
+  --err: #f0616d;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f6f8; --surface: #ffffff; --surface-2: #f0f2f5;
+    --border: #dde1e8; --text: #171b22; --muted: #667085;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+h1 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
+h1 span { color: var(--muted); font-weight: 400; }
+
+.status { font-size: 13px; color: var(--muted); }
+.status .bad { color: var(--err); }
+.status .good { color: var(--ok); }
+
+main { max-width: 860px; margin: 0 auto; padding: 24px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.card h2 { margin: 0 0 4px; font-size: 16px; }
+.hint { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+
+.section-title { font-size: 14px; color: var(--muted); margin: 32px 0 12px; font-weight: 600; }
+
+form { display: flex; flex-direction: column; gap: 14px; }
+label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.row { display: flex; gap: 14px; }
+.row label { flex: 1; }
+
+input[type=url], input[type=number] {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  width: 100%;
+}
+input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.check { flex-direction: row; align-items: center; gap: 8px; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+button {
+  background: var(--accent); color: #fff; border: 0;
+  border-radius: 8px; padding: 11px 18px;
+  font: 600 14px/1 inherit; cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.error { color: var(--err); font-size: 13px; }
+.error:empty { display: none; }
+.empty { color: var(--muted); font-size: 13px; }
+
+.jobs { display: flex; flex-direction: column; gap: 12px; }
+
+.job {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.job-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.job-title { font-weight: 600; font-size: 14px; word-break: break-word; }
+.job-url { font-size: 12px; color: var(--muted); word-break: break-all; }
+
+.badge {
+  font-size: 11px; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.badge.running { color: var(--accent); border-color: var(--accent); }
+.badge.done { color: var(--ok); border-color: var(--ok); }
+.badge.failed { color: var(--err); border-color: var(--err); }
+
+.bar { height: 5px; background: var(--surface-2); border-radius: 999px; margin: 12px 0 6px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); transition: width .4s ease; }
+.msg { font-size: 12px; color: var(--muted); }
+
+.clips { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
+.clip { background: var(--surface-2); border-radius: 8px; padding: 10px; }
+.clip video { width: 100%; border-radius: 6px; background: #000; display: block; }
+.clip-label { font-size: 13px; font-weight: 600; margin: 8px 0 2px; }
+.clip-meta { font-size: 11px; color: var(--muted); }
+.clip-reason { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.clip a { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--accent); }
+
+.job-actions { display: flex; gap: 10px; margin-top: 12px; }
+.link-btn { background: none; border: 0; color: var(--muted); font-size: 12px; padding: 0; cursor: pointer; }
+.link-btn:hover { color: var(--err); }
