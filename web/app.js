@@ -235,8 +235,13 @@ function usageRow(m) {
 
 function asetRow(a) {
   if (!a) return "";
-  return `<div class="use-total">Aset unggahan: ${a.jumlah} berkas, ${a.mb} MB
-    <button type="button" id="btnBersih" class="link-btn">Bersihkan sekarang</button></div>`;
+  // Ini soal ruang disk, bukan kuota API - dipisahkan supaya tidak terbaca
+  // sebagai bagian dari angka pemakaian di atasnya.
+  return `<div class="use-disk">
+    <span class="use-disk-label">Penyimpanan aset unggahan</span>
+    <span>${a.jumlah} berkas &middot; ${a.mb} MB
+      <button type="button" id="btnBersih" class="link-btn">Bersihkan sekarang</button></span>
+  </div>`;
 }
 
 async function refreshUsage() {
@@ -244,19 +249,16 @@ async function refreshUsage() {
     const u = await (await fetch("/api/usage")).json();
     const el = $("usage");
     if (!u.models.length) {
-      el.innerHTML = `<p class="empty">Belum ada pemakaian hari ini.</p>
-        ${asetRow(u.aset)}
-        ${asetRow(u.aset)}
-       <p class="use-note">${esc(u.catatan)}</p>`;
+      el.innerHTML = `<p class="empty">Belum ada pemakaian API hari ini.</p>
+        <p class="use-note">${esc(u.catatan)}</p>${asetRow(u.aset)}`;
       return;
     }
     const gagal = u.gagal_kuota_hari_ini
       ? `<div class="use-warn">${u.gagal_kuota_hari_ini}x ditolak karena kuota hari ini</div>` : "";
-    el.innerHTML = u.models.map(usageRow).join("") + gagal +
-      `<div class="use-total">Hari ini $${u.biaya_hari_ini.toFixed(4)}
-        &middot; 30 hari terakhir $${u.biaya_30_hari.toFixed(3)}</div>
-       ${asetRow(u.aset)}
-       <p class="use-note">${esc(u.catatan)}</p>`;
+    const biaya = `<div class="use-total">Biaya hari ini $${u.biaya_hari_ini.toFixed(4)}
+      &middot; 30 hari terakhir $${u.biaya_30_hari.toFixed(3)}</div>`;
+    el.innerHTML = u.models.map(usageRow).join("") + gagal + biaya +
+      `<p class="use-note">${esc(u.catatan)}</p>${asetRow(u.aset)}`;
   } catch {
     $("usage").innerHTML = '<p class="empty">Gagal memuat pemakaian.</p>';
   }
