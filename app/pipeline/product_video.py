@@ -7,6 +7,7 @@ durasi tiap scene mengikuti panjang audionya.
 from __future__ import annotations
 
 import os
+import random
 import re
 import subprocess
 import textwrap
@@ -42,6 +43,20 @@ VIDEO_PRESET = "medium"
 
 # Seberapa jauh gambar membesar/mengecil sepanjang satu scene.
 ZOOM_RANGE = 0.12
+
+# Semua video dulu memakai tata letak yang sama persis, jadi deretan postingan
+# terlihat seragam. Satu tata letak dipilih per video (konsisten di dalam video
+# itu sendiri - berganti-ganti antar scene malah terlihat berantakan).
+LAYOUTS = ("blur-tengah", "terang-tengah", "panel-bawah")
+
+# Durasi kartu hook di awal video, di luar durasi narasinya.
+HOOK_CARD_PAD = 0.45
+# Perkiraan total kartu hook (narasi 3-8 kata + jeda), untuk menghitung sisa scene.
+HOOK_CARD_SECONDS = 2.6
+
+# Tempo bicara diacak tipis supaya beberapa video berurutan tidak terdengar
+# seperti dibacakan oleh mesin yang sama persis.
+TTS_RATES = ("+8%", "+12%", "+16%")
 # Perkiraan dari pengukuran: narasi 8-18 kata plus jeda akhir memakan sekitar
 # 4,6-5,9 detik per scene tergantung suara dan panjang kalimat. Durasi akhir
 # karena itu meleset beberapa detik dari target - ini perkiraan, bukan jaminan.
@@ -142,16 +157,47 @@ def _zoom_expr(duration: float, idx: int) -> str:
     return f"z='{1 + ZOOM_RANGE}-{ZOOM_RANGE}*on/{frames}'"
 
 
-def _render_scene(image: Path, duration: float, caption: str, out: Path, work: Path, idx: int) -> None:
-    """Satu scene: background blur, produk di tengah, zoom pelan, subtitle."""
-    chain = [
+def _layout_chain(layout: str) -> tuple[list[str], dict]:
+    """Rantai filter latar + gaya subtitle untuk satu tata letak.
+
+    Semua tata letak dirancang tetap aman untuk foto produk kotak berlatar putih,
+    yang paling umum di marketplace.
+    """
+    if layout == "terang-tengah":
+        # Latar hanya dinaikkan sedikit: kalau terlalu putih, foto produk yang
+        # juga berlatar putih kehilangan tepinya. Subtitle memakai kotak kuning
+        # supaya tetap kontras di atas latar terang.
+        return ([
+            f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+            "boxblur=40:3,eq=brightness=0.08:saturation=0.45[bg]",
+            f"[0:v]scale={int(W * 0.84)}:-1[fg]",
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2-90[base]",
+        ], {"fontcolor": "black", "boxcolor": "0xFFD400@0.95", "y": "h-text_h-330"})
+
+    if layout == "panel-bawah":
+        return ([
+            f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+            "boxblur=34:2,eq=brightness=-0.28:saturation=0.7[bg]",
+            f"[0:v]scale={int(W * 0.88)}:-1[fg]",
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2-210[base]",
+        ], {"fontcolor": "white", "boxcolor": "black@0.72", "y": "h-text_h-260"})
+
+    return ([
         f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
         "boxblur=30:2,eq=brightness=-0.10[bg]",
         f"[0:v]scale={int(W * 0.91)}:-1[fg]",
         "[bg][fg]overlay=(W-w)/2:(H-h)/2[base]",
+    ], {"fontcolor": "white", "boxcolor": "black@0.55", "y": "h-text_h-360"})
+
+
+def _render_scene(image: Path, duration: float, caption: str, out: Path, work: Path,
+                  idx: int, layout: str = "blur-tengah") -> None:
+    """Satu scene: latar sesuai tata letak, produk, zoom pelan, subtitle."""
+    chain, style = _layout_chain(layout)
+    chain.append(
         f"[base]zoompan={_zoom_expr(duration, idx)}:d=1:"
-        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={W}x{H}:fps={FPS}[zm]",
-    ]
+        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={W}x{H}:fps={FPS}[zm]"
+    )
 
     last = "[zm]"
     font = _font()
@@ -161,9 +207,9 @@ def _render_scene(image: Path, duration: float, caption: str, out: Path, work: P
         cap_file.write_text(_wrap(caption), encoding="utf-8")
         chain.append(
             f"{last}drawtext=fontfile='{_esc(font)}':textfile='{_esc(cap_file)}':"
-            "fontcolor=white:fontsize=52:line_spacing=12:"
-            "box=1:boxcolor=black@0.55:boxborderw=24:"
-            f"x=(w-text_w)/2:y=h-text_h-360[v]"
+            f"fontcolor={style['fontcolor']}:fontsize=52:line_spacing=12:"
+            f"box=1:boxcolor={style['boxcolor']}:boxborderw=24:"
+            f"x=(w-text_w)/2:y={style['y']}[v]"
         )
         last = "[v]"
     else:
@@ -178,9 +224,73 @@ def _render_scene(image: Path, duration: float, caption: str, out: Path, work: P
     ])
 
 
+# Frame pertama adalah yang paling menentukan penonton lanjut atau scroll, jadi
+# kartu hook ikut berganti gaya mengikuti tata letak video - kalau tidak, semua
+# postingan tetap dibuka dengan tampilan yang sama persis.
+_HOOK_CARD_STYLES = {
+    "terang-tengah": {
+        "bg": "eq=brightness=0.14:saturation=0.4",
+        "text": "fontcolor=black:box=1:boxcolor=0xFFD400@0.95:boxborderw=26",
+    },
+    "panel-bawah": {
+        "bg": "eq=brightness=-0.5:saturation=0.5",
+        "text": "fontcolor=0xFFD400:shadowcolor=black@0.85:shadowx=4:shadowy=4",
+    },
+    "blur-tengah": {
+        "bg": "eq=brightness=-0.42:saturation=0.6",
+        "text": "fontcolor=white:shadowcolor=black@0.8:shadowx=4:shadowy=4",
+    },
+}
+
+
+def _render_hook_card(image: Path, duration: float, text: str, out: Path, work: Path,
+                      layout: str = "blur-tengah") -> None:
+    """Kartu pembuka: teks besar di atas latar produk yang dikaburkan.
+
+    Satu detik pertama menentukan penonton lanjut atau scroll, jadi hook-nya
+    dibuat terbaca sebagai teks besar, bukan hanya terdengar.
+    """
+    font = _font()
+    style = _HOOK_CARD_STYLES.get(layout, _HOOK_CARD_STYLES["blur-tengah"])
+    chain = [
+        f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+        f"boxblur=26:3,{style['bg']}[bg]",
+        f"[bg]zoompan=z='1+0.08*on/{max(1, int(duration * FPS))}':d=1:"
+        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={W}x{H}:fps={FPS}[zm]",
+    ]
+    if font and text.strip():
+        card = work / "hook-card.txt"
+        card.write_text(_wrap(text, width=16), encoding="utf-8")
+        chain.append(
+            f"[zm]drawtext=fontfile='{_esc(font)}':textfile='{_esc(card)}':"
+            f"fontsize=92:line_spacing=18:{style['text']}:"
+            "x=(w-text_w)/2:y=(h-text_h)/2[v]"
+        )
+    else:
+        chain.append("[zm]null[v]")
+
+    run_ffmpeg([
+        "-loop", "1", "-framerate", str(FPS), "-t", f"{duration:.3f}", "-i", str(image),
+        "-filter_complex", ";".join(chain),
+        "-map", "[v]",
+        "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", "20", "-pix_fmt", "yuv420p",
+        str(out),
+    ])
+
+
 def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
-    voice = params.get("voice", tts.DEFAULT_VOICE)
     target = int(params.get("duration", 30))
+    use_card = params.get("hook_card", True) is not False
+
+    # Diacak per job tapi tetap dari job_id, jadi job yang sama selalu
+    # menghasilkan pilihan yang sama kalau diulang.
+    rnd = random.Random(job_id)
+    layout = params.get("layout") or rnd.choice(LAYOUTS)
+    hook_style = params.get("hook_style") or rnd.choice(list(gemini.HOOK_STYLES))
+    voice = params.get("voice") or "acak"
+    if voice not in tts.VOICES:
+        voice = rnd.choice(list(tts.VOICES))
+    rate = rnd.choice(TTS_RATES)
 
     report(5, "Membaca halaman produk...")
     product = extract(url)
@@ -203,46 +313,59 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     # rata-rata SECONDS_PER_SCENE detik setelah dinarasikan.
     # Gambar diputar ulang kalau scene lebih banyak, jadi jumlah gambar tidak
     # membatasi durasi video.
-    scene_count = max(2, min(round(target / SECONDS_PER_SCENE), MAX_SCENES))
+    budget = target - (HOOK_CARD_SECONDS if use_card else 0)
+    scene_count = max(2, min(round(budget / SECONDS_PER_SCENE), MAX_SCENES))
     report(35, "Menulis naskah dengan Gemini...")
     script = gemini.write_product_script(
-        product.as_dict(), scene_count, target, on_status=lambda m: report(35, m)
+        product.as_dict(), scene_count, target,
+        on_status=lambda m: report(35, m), hook_style=hook_style,
     )
     scenes = script["scenes"]
+    hook_text = script["hook"] if use_card else ""
 
     # Semua narasi dibuat sekaligus dalam satu event loop. Tiap kalimat tetap
     # jadi berkas sendiri supaya durasinya bisa diukur persis, tapi koneksinya
     # jalan berbarengan - jauh lebih cepat daripada satu per satu.
-    report(45, f"Membuat narasi suara ({len(scenes)} scene)...")
-    audios = tts.synth_many(
-        [(scene["narration"], work / f"voice-{i:02d}.mp3") for i, scene in enumerate(scenes)],
-        voice=voice,
-    )
+    narrations: list[tuple[str, Path]] = []
+    if hook_text:
+        narrations.append((hook_text, work / "voice-hook.mp3"))
+    narrations += [(scene["narration"], work / f"voice-{i:02d}.mp3")
+                   for i, scene in enumerate(scenes)]
+
+    report(45, f"Membuat narasi suara ({len(narrations)} bagian, suara {voice})...")
+    audios = tts.synth_many(narrations, voice=voice, rate=rate)
 
     durations = [ffprobe_duration(a) for a in audios]
     for i, dur in enumerate(durations):
         if dur <= 0:
-            raise RuntimeError(f"Durasi audio scene {i + 1} tidak terbaca.")
+            raise RuntimeError(f"Durasi audio bagian {i + 1} tidak terbaca.")
 
-    # Kalau scene lebih banyak daripada gambar, gambar diputar ulang.
-    clips = [work / f"scene-{i:02d}.mp4" for i in range(len(scenes))]
-    workers = min(RENDER_PARALLEL, len(scenes))
-    report(52, f"Membuat {len(scenes)} scene ({workers} paralel)...")
+    offset = 1 if hook_text else 0
+    clips = [work / "scene-hook.mp4"] if hook_text else []
+    clips += [work / f"scene-{i:02d}.mp4" for i in range(len(scenes))]
+
+    workers = min(RENDER_PARALLEL, len(clips))
+    report(52, f"Membuat {len(clips)} bagian ({workers} paralel, {layout})...")
 
     def render_one(i: int) -> int:
-        # Jeda kecil di akhir agar potongan tidak terasa terburu-buru.
-        _render_scene(images[i % len(images)], durations[i] + 0.35,
-                      scenes[i]["caption"], clips[i], work, i)
+        if hook_text and i == 0:
+            _render_hook_card(images[0], durations[0] + HOOK_CARD_PAD,
+                              hook_text, clips[0], work, layout=layout)
+        else:
+            j = i - offset
+            # Jeda kecil di akhir agar potongan tidak terasa terburu-buru.
+            _render_scene(images[j % len(images)], durations[i] + 0.35,
+                          scenes[j]["caption"], clips[i], work, j, layout=layout)
         return i
 
     done = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(render_one, i) for i in range(len(scenes))]
+        futures = [pool.submit(render_one, i) for i in range(len(clips))]
         for future in as_completed(futures):
             future.result()  # lempar ulang error dari thread mana pun
             done += 1
-            report(52 + int(done / len(scenes) * 33),
-                   f"Membuat scene... {done}/{len(scenes)} selesai")
+            report(52 + int(done / len(clips) * 33),
+                   f"Membuat bagian... {done}/{len(clips)} selesai")
 
     report(88, "Menggabungkan video...")
     listing = work / "concat.txt"
@@ -281,7 +404,9 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
         reason=f"{script['post_caption']}\n{tags}\n\n"
                f"--- referensi, jangan ikut diposting ---\n"
                f"Harga asli: {product.price_text or 'tidak terbaca'}"
-               f"{f' (disebut sebagai {vague})' if vague else ''}\n{product.url}",
+               f"{f' (disebut sebagai {vague})' if vague else ''}\n"
+               f"Variasi: hook {hook_style} - tata letak {layout} - suara {voice} {rate}\n"
+               f"{product.url}",
         score=None,
     )
 

@@ -59,6 +59,22 @@ _SCRIPT_SCHEMA = {
     "required": ["hook", "scenes", "post_caption", "hashtags"],
 }
 
+# Tanpa arahan gaya, model selalu jatuh ke rumus yang sama: keluhan diakhiri
+# tanda tanya. Dari 8 naskah uji, 8-8nya berbentuk pertanyaan dan 7 di antaranya
+# memakai pola keluhan. Satu gaya dipilih acak per video supaya tidak seragam.
+HOOK_STYLES: dict[str, str] = {
+    "keluhan": "Buka dengan keluhan sehari-hari yang bikin penonton mengangguk. Boleh diakhiri tanda tanya.",
+    "klaim": "Buka dengan klaim berani berbentuk pernyataan, BUKAN pertanyaan. Contoh pola: 'Ini sepatu paling gampang dipakai yang pernah aku punya.'",
+    "pov": "Buka dengan sudut pandang orang pertama memakai awalan 'POV:' lalu satu situasi yang relatable.",
+    "banding": "Buka dengan membandingkan produk ini terhadap kebiasaan lama penonton, tanpa menyebut merek lain.",
+    "nilai": "Buka dengan menyoroti nilai yang didapat dibanding harganya, tanpa menyebut angka harga.",
+    "salah-kaprah": "Buka dengan mengoreksi anggapan yang salah. Contoh pola: 'Selama ini kamu salah pilih ...'",
+    "demo": "Buka langsung ke aksi memakai produknya, seolah kamera sudah merekam. Jangan menyapa penonton.",
+    "rahasia": "Buka seperti membocorkan temuan pribadi yang belum banyak orang tahu.",
+    "peringatan": "Buka dengan peringatan singkat supaya penonton berhenti scroll. Contoh pola: 'Jangan beli ... sebelum lihat ini.'",
+}
+
+
 _SCRIPT_PROMPT = """Kamu penulis naskah video afiliasi untuk TikTok dan Reels, audiens Indonesia dan Malaysia.
 
 Tulis naskah video vertikal berdurasi sekitar {duration} detik untuk produk berikut.
@@ -68,9 +84,12 @@ Kisaran harga : {price}
 Toko          : {shop}
 Deskripsi     : {description}
 
+Gaya hook yang WAJIB dipakai kali ini: {hook_style}
+
 Buat TEPAT {scenes} scene. Aturan:
-- Scene pertama adalah hook: langsung ke masalah atau manfaat, jangan basa-basi
-  dan jangan menyapa penonton.
+- Field `hook` dan scene pertama harus mengikuti gaya hook di atas, jangan
+  memakai gaya lain. Jangan basa-basi dan jangan menyapa penonton.
+- `hook` maksimal 8 kata dan harus enak dibaca sebagai teks besar di layar.
 - Narasi memakai bahasa Indonesia sehari-hari yang santai, seperti ngobrol.
   Hindari bahasa iklan kaku seperti "produk berkualitas tinggi".
 - Setiap narration 8-18 kata, satu kalimat, enak dibaca mesin text-to-speech.
@@ -90,7 +109,8 @@ Kalau deskripsi produk minim, fokus ke manfaat yang jelas dari nama produknya. J
 
 
 def write_product_script(product: dict, scenes: int, duration: int,
-                         on_status: Callable[[str], None] | None = None) -> dict:
+                         on_status: Callable[[str], None] | None = None,
+                         hook_style: str | None = None) -> dict:
     """Minta Gemini menulis naskah video promosi dari data produk."""
     client = _client()
     desc = (product.get("description") or "").strip()[:1500] or "(tidak tersedia)"
@@ -102,6 +122,7 @@ def write_product_script(product: dict, scenes: int, duration: int,
         description=desc,
         scenes=scenes,
         duration=duration,
+        hook_style=HOOK_STYLES.get(hook_style or "", HOOK_STYLES["keluhan"]),
     )
 
     if on_status:

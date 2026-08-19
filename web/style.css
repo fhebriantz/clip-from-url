@@ -87,6 +87,7 @@ button {
 button:disabled { opacity: .5; cursor: not-allowed; }
 
 .opt { font-weight: 400; opacity: .75; }
+.hint.small { margin: -4px 0 0; font-size: 12px; }
 input[type=text] {
   background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
   border-radius: 8px; padding: 10px 12px; font: inherit; width: 100%;

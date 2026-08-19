@@ -42,7 +42,8 @@ app = FastAPI(title="clip-from-url", lifespan=lifespan)
 class ProductRequest(BaseModel):
     url: str = Field(min_length=8)
     duration: int = Field(default=30, ge=15, le=60)
-    voice: str = "pria"
+    voice: str = "acak"
+    hook_card: bool = True
     # TikTok Shop tidak pernah mengekspos harga; Shopee kadang juga tidak.
     price_text: str = Field(default="", max_length=32)
 
@@ -61,8 +62,8 @@ class ProductRequest(BaseModel):
     @field_validator("voice")
     @classmethod
     def _check_voice(cls, v: str) -> str:
-        if v not in tts.VOICES:
-            raise ValueError(f"Suara harus salah satu dari: {', '.join(tts.VOICES)}")
+        if v != "acak" and v not in tts.VOICES:
+            raise ValueError(f"Suara harus 'acak' atau salah satu dari: {', '.join(tts.VOICES)}")
         return v
 
 
@@ -82,7 +83,12 @@ def create_product(req: ProductRequest) -> dict[str, str]:
     job_id = db.create_job(
         "product",
         req.url,
-        {"duration": req.duration, "voice": req.voice, "price_text": req.price_text},
+        {
+            "duration": req.duration,
+            "voice": req.voice,
+            "hook_card": req.hook_card,
+            "price_text": req.price_text,
+        },
     )
     return {"job_id": job_id}
 

@@ -109,6 +109,7 @@ $("formProduct").addEventListener("submit", (e) => {
     url: $("pUrl").value.trim(),
     duration: Number($("pDuration").value),
     voice: $("pVoice").value,
+    hook_card: $("pHookCard").checked,
     price_text: $("pPrice").value.trim(),
   }, "product");
 });

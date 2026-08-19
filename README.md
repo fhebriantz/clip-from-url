@@ -134,6 +134,41 @@ web/             UI (HTML/CSS/JS, tanpa build step)
 data/            database, berkas kerja, dan hasil
 ```
 
+## Variasi antar video
+
+Tanpa variasi, deretan postingan terlihat seragam dan penonton mengenali polanya.
+Dari 8 naskah uji versi awal, **8-8nya** membuka dengan kalimat tanya dan 7 memakai
+pola keluhan yang sama. Karena itu tiap video mengacak empat hal sekaligus:
+
+| Yang diacak | Pilihan |
+|---|---|
+| Gaya hook | keluhan, klaim, POV, banding, nilai, salah-kaprah, demo, rahasia, peringatan |
+| Tata letak | `blur-tengah`, `terang-tengah` (subtitle kuning), `panel-bawah` |
+| Suara | Ardi / Gadis |
+| Tempo bicara | +8% / +12% / +16% |
+
+Tata letak dipilih satu per video dan dipakai konsisten di semua scene-nya -
+berganti-ganti di dalam satu video justru terlihat berantakan.
+
+Pengacakan diambil dari `job_id`, jadi job yang sama selalu menghasilkan pilihan
+yang sama kalau diulang. Kombinasi yang terpakai dicatat di riwayat supaya kamu
+bisa melihat gaya mana yang performanya bagus.
+
+### Kartu hook
+
+Video dibuka dengan satu kartu berisi hook sebagai teks besar, sekitar 2-3 detik,
+lengkap dengan narasinya. Gayanya ikut mengikuti tata letak - kalau tidak, semua
+postingan tetap terbuka dengan tampilan yang sama persis, padahal frame pertama
+yang paling menentukan penonton lanjut atau scroll. Bisa dimatikan lewat centang
+di UI.
+
+### Musik latar sengaja tidak ada
+
+Algoritma TikTok memberi jangkauan lebih ke video yang memakai *trending sound*
+dari dalam aplikasi. Kalau musik dibakar ke dalam berkas, keuntungan itu hilang.
+Video keluar dengan narasi saja supaya kamu bisa menambahkan sound trending saat
+upload.
+
 ## Kecepatan
 
 Narasi seluruh scene dibuat berbarengan dalam satu event loop, dan render scene

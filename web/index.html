@@ -33,11 +33,18 @@
         </label>
         <label>Suara narator
           <select id="pVoice">
+            <option value="acak">Acak (disarankan)</option>
             <option value="pria">Pria (Ardi)</option>
             <option value="wanita">Wanita (Gadis)</option>
           </select>
         </label>
       </div>
+      <label class="check">
+        <input id="pHookCard" type="checkbox" checked>
+        <span>Kartu hook di awal (teks besar penahan scroll)</span>
+      </label>
+      <p class="hint small">Gaya hook dan tata letak dipilih acak tiap video supaya
+        deretan postingan tidak terlihat seragam. Pilihannya dicatat di riwayat.</p>
       <button type="submit">Buat video</button>
       <div class="error" data-err="product"></div>
     </form>
