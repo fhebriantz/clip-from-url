@@ -21,7 +21,10 @@ from google.genai import errors as genai_errors
 from google.genai import types
 
 from .. import usage
-from ..config import GEMINI_API_KEY, GEMINI_TTS_MODEL, TTS_PROVIDER
+from .gemini import make_client
+from ..config import (
+    GEMINI_API_KEY, GEMINI_TTS_FALLBACKS, GEMINI_TTS_MODEL, TTS_PROVIDER,
+)
 from ..tools import ensure_ffmpeg, ffprobe_duration
 
 # Suara Gemini per jenis kelamin, dipilih dari hasil uji dengar.
@@ -50,7 +53,21 @@ DEFAULT_STYLE = "energik"
 
 SAMPLE_RATE = 24_000
 _ATTEMPTS = 3
-_RETRY_CODES = {429, 500, 502, 503, 504}
+# Dibedakan dengan sengaja: model sibuk (5xx) layak ditunggu karena bisa pulih
+# dalam hitungan detik, sedangkan kuota habis (429) tidak akan pulih hari itu -
+# mengulanginya hanya membuang waktu, lebih baik langsung pindah model.
+_BUSY_CODES = {500, 502, 503, 504}
+_QUOTA_CODES = {429}
+_RETRY_CODES = _BUSY_CODES | _QUOTA_CODES
+
+
+def tts_model_chain(utama: str = "") -> list[str]:
+    """Model TTS yang dicoba berurutan. Suara yang dipakai tersedia di semuanya."""
+    out: list[str] = []
+    for m in [utama or GEMINI_TTS_MODEL, GEMINI_TTS_MODEL, *GEMINI_TTS_FALLBACKS]:
+        if m and m not in out:
+            out.append(m)
+    return out
 
 # Tier gratis Gemini membatasi JUMLAH REQUEST, bukan panjang audionya. Satu video
 # berisi 5-6 kalimat, jadi meminta satu per satu menghabiskan jatah harian hanya
@@ -178,7 +195,7 @@ def _split_audio(src: Path, stems: list[Path]) -> list[Path]:
 
 
 def _gemini_one(client: genai.Client, text: str, voice_name: str, style: str,
-                stem: Path, multi: bool = False) -> Path:
+                stem: Path, multi: bool = False, model: str = "") -> Path:
     instruction = STYLES.get(style, STYLES[DEFAULT_STYLE])
     if multi:
         # Jeda dibutuhkan hanya sebagai penanda potong; panjangnya tidak penting
@@ -189,7 +206,7 @@ def _gemini_one(client: genai.Client, text: str, voice_name: str, style: str,
     for attempt in range(1, _ATTEMPTS + 1):
         try:
             resp = client.models.generate_content(
-                model=GEMINI_TTS_MODEL,
+                model=model or GEMINI_TTS_MODEL,
                 contents=f"{instruction}: {text}",
                 config=types.GenerateContentConfig(
                     response_modalities=["AUDIO"],
@@ -201,7 +218,7 @@ def _gemini_one(client: genai.Client, text: str, voice_name: str, style: str,
             )
             u = getattr(resp, "usage_metadata", None)
             if u:
-                usage.record("suara", GEMINI_TTS_MODEL,
+                usage.record("suara", model or GEMINI_TTS_MODEL,
                              u.prompt_token_count or 0, u.candidates_token_count or 0)
             pcm = resp.candidates[0].content.parts[0].inline_data.data
             if not pcm:
@@ -212,8 +229,9 @@ def _gemini_one(client: genai.Client, text: str, voice_name: str, style: str,
             return out
         except (genai_errors.ServerError, genai_errors.ClientError) as exc:
             last = exc
-            usage.record("suara", GEMINI_TTS_MODEL, 0, 0, ok=False, note=str(exc))
-            if getattr(exc, "code", None) not in _RETRY_CODES or attempt == _ATTEMPTS:
+            code = getattr(exc, "code", None)
+            usage.record("suara", model or GEMINI_TTS_MODEL, 0, 0, ok=False, note=str(exc))
+            if code in _QUOTA_CODES or code not in _RETRY_CODES or attempt == _ATTEMPTS:
                 break
             time.sleep(delay)
             delay = min(delay * 2, 20.0)
@@ -254,7 +272,7 @@ def synth_many(items: list[tuple[str, Path]], gender: str = DEFAULT_VOICE,
                voice_name: str = "", style: str = DEFAULT_STYLE,
                rate: str = DEFAULT_RATE,
                on_status: Callable[[str], None] | None = None,
-               meta: dict | None = None) -> list[Path]:
+               meta: dict | None = None, model_override: str = "") -> list[Path]:
     """Ubah banyak teks jadi berkas audio. `items` berisi (teks, path tanpa ekstensi).
 
     Urutan hasil mengikuti urutan masukan. `meta` diisi dengan mesin dan suara
@@ -272,14 +290,22 @@ def synth_many(items: list[tuple[str, Path]], gender: str = DEFAULT_VOICE,
 
     if TTS_PROVIDER == "gemini" and GEMINI_API_KEY:
         chosen = voice_name or voice_pool(gender)[0]
-        try:
-            outs = _gemini_batch(cleaned, chosen, style)
-            if meta is not None:
-                meta.update(provider="gemini", voice=chosen, style=style)
-            return outs
-        except Exception as exc:  # noqa: BLE001 - jangan gagalkan job karena suara
+        rantai = tts_model_chain(model_override)
+        for i, model in enumerate(rantai):
+            # Status diberitahukan SEBELUM mencoba, bukan setelah gagal. Kalau
+            # tidak, pesan kegagalan model sebelumnya tetap terpampang selama
+            # model berikutnya bekerja dan waktunya tercatat di tahap yang salah.
             if on_status:
-                on_status(f"Gemini TTS gagal ({str(exc)[:70]}), pakai edge-tts...")
+                on_status(f"Narasi dengan {model} ({len(cleaned)} bagian)...")
+            try:
+                outs = _gemini_batch(cleaned, chosen, style, model)
+                if meta is not None:
+                    meta.update(provider=model, voice=chosen, style=style)
+                return outs
+            except Exception as exc:  # noqa: BLE001 - coba model berikutnya
+                if on_status:
+                    sisa = "coba model berikutnya" if i + 1 < len(rantai) else "pakai edge-tts"
+                    on_status(f"{model} gagal ({str(exc)[:60]}), {sisa}")
 
     outs = _edge_many(cleaned, gender, rate)
     if meta is not None:
@@ -288,12 +314,14 @@ def synth_many(items: list[tuple[str, Path]], gender: str = DEFAULT_VOICE,
     return outs
 
 
-def _gemini_batch(items: list[tuple[str, Path]], voice_name: str, style: str) -> list[Path]:
+def _gemini_batch(items: list[tuple[str, Path]], voice_name: str, style: str,
+                  model: str = "") -> list[Path]:
     """Satu request untuk seluruh narasi, lalu dipotong di jeda antar kalimat."""
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = make_client()
     joined = "\n\n".join(text for text, _ in items)
     tmp = items[0][1].parent / "narasi-utuh"
-    whole = _gemini_one(client, joined, voice_name, style, tmp, multi=len(items) > 1)
+    whole = _gemini_one(client, joined, voice_name, style, tmp,
+                        multi=len(items) > 1, model=model)
     try:
         return _split_audio(whole, [stem for _, stem in items])
     finally:

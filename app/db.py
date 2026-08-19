@@ -176,6 +176,24 @@ def asset_refs() -> dict[str, str]:
     return terbaru
 
 
+def model_events() -> dict[str, dict[str, str]]:
+    """Per model: kapan terakhir berhasil, dan kapan terakhir ditolak karena kuota."""
+    with _lock:
+        ok = _db().execute(
+            "SELECT model, MAX(created_at) AS t FROM usage WHERE ok=1 GROUP BY model"
+        ).fetchall()
+        quota = _db().execute(
+            "SELECT model, MAX(created_at) AS t FROM usage "
+            "WHERE ok=0 AND note LIKE '%429%' GROUP BY model"
+        ).fetchall()
+    out: dict[str, dict[str, str]] = {}
+    for r in ok:
+        out.setdefault(r["model"], {})["sukses"] = r["t"]
+    for r in quota:
+        out.setdefault(r["model"], {})["kuota"] = r["t"]
+    return out
+
+
 def last_used_model(kind: str) -> str:
     """Model yang benar-benar dipakai terakhir kali untuk jenis panggilan ini."""
     with _lock:

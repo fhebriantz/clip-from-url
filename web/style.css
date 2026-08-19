@@ -197,3 +197,5 @@ textarea {
   font-size: 12px;
 }
 .use-disk-label { color: var(--muted); }
+
+.opt-habis { color: var(--err); }

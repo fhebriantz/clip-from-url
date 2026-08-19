@@ -78,12 +78,46 @@ function renderJobs(jobs) {
   el.dataset.sig = sig;
   el.innerHTML = jobs.map(renderJob).join("");
   refreshUsage();
+  refreshModels();
 }
 
 $("jobs").addEventListener("click", async (e) => {
   const id = e.target.dataset?.del;
   if (!id || !confirm("Hapus job ini beserta seluruh berkasnya?")) return;
   await fetch(`/api/jobs/${id}`, { method: "DELETE" });
+});
+
+/* ---------------------------------------------------------------- model */
+
+function opsiModel(m) {
+  const tanda = [];
+  if (m.rekomendasi) tanda.push("rekomendasi");
+  if (m.habis) tanda.push(`kuota habis, pulih ${m.pulih}`);
+  const label = `${m.label}${tanda.length ? " - " + tanda.join(", ") : ""}`;
+  // Model yang kuotanya habis tidak dinonaktifkan: rantai cadangan tetap jalan,
+  // dan kuotanya bisa saja sudah pulih lebih cepat dari perkiraan.
+  return `<option value="${esc(m.id)}" ${m.habis ? 'class="opt-habis"' : ""}>${esc(label)}</option>`;
+}
+
+async function refreshModels() {
+  try {
+    const k = await (await fetch("/api/models")).json();
+    for (const [id, daftar] of [["pScriptModel", k.naskah], ["pTtsModel", k.suara]]) {
+      const el = $(id);
+      const dipilih = el.value;
+      el.innerHTML = daftar.map(opsiModel).join("");
+      if (dipilih && daftar.some((m) => m.id === dipilih)) el.value = dipilih;
+      const aktif = daftar.find((m) => m.id === el.value);
+      el.title = aktif ? aktif.note : "";
+    }
+  } catch { /* biarkan kosong kalau server belum siap */ }
+}
+
+["pScriptModel", "pTtsModel"].forEach((id) => {
+  document.addEventListener("change", (e) => {
+    if (e.target.id !== id) return;
+    refreshModels();
+  });
 });
 
 /* ----------------------------------------------------------------- aset */
@@ -300,6 +334,8 @@ $("formProduct").addEventListener("submit", (e) => {
     voice: $("pVoice").value,
     hook_card: $("pHookCard").checked,
     price_text: $("pPrice").value.trim(),
+    script_model: $("pScriptModel").value,
+    tts_model: $("pTtsModel").value,
     assets: ASSETS.map((a) => ({ id: a.id, start: a.start ?? 0, end: a.end ?? 0 })),
     description: $("pDesc").value.trim(),
   }, "product");
@@ -309,6 +345,7 @@ const stream = new EventSource("/api/events");
 stream.onmessage = (e) => renderJobs(JSON.parse(e.data));
 
 checkHealth();
+refreshModels();
 refreshUsage();
 setInterval(refreshUsage, 60000);
 

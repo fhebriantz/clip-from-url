@@ -23,6 +23,12 @@ IS_WINDOWS = sys.platform == "win32"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
 GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview").strip()
+# Dicoba berurutan kalau model utama kehabisan kuota atau sedang sibuk.
+GEMINI_TTS_FALLBACKS = [
+    m.strip() for m in os.getenv(
+        "GEMINI_TTS_FALLBACKS", "gemini-2.5-flash-preview-tts"
+    ).split(",") if m.strip()
+]
 # Menulis 4 kalimat promosi tidak butuh penalaran panjang. Dengan "low", token
 # thinking turun dari ~1.500 ke 0 dan biaya naskah hemat sekitar 76%.
 GEMINI_THINKING = os.getenv("GEMINI_THINKING", "low").strip().lower()

@@ -397,6 +397,7 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     script = gemini.write_product_script(
         product.as_dict(), scene_count, target,
         on_status=lambda m: report(35, m), hook_style=hook_style,
+        model_override=str(params.get("script_model") or ""),
     )
     scenes = script["scenes"]
     hook_text = script["hook"] if use_card else ""
@@ -410,11 +411,12 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     narrations += [(scene["narration"], work / f"voice-{i:02d}")
                    for i, scene in enumerate(scenes)]
 
-    report(45, f"Membuat narasi suara ({len(narrations)} bagian, {voice_name} gaya {speech_style})...")
+    report(45, f"Menyiapkan narasi ({voice_name}, gaya {speech_style})...")
     tts_meta: dict = {}
     audios = tts.synth_many(
         narrations, gender=gender, voice_name=voice_name, style=speech_style,
         rate=rate, on_status=lambda m: report(45, m), meta=tts_meta,
+        model_override=str(params.get("tts_model") or ""),
     )
 
     durations = [ffprobe_duration(a) for a in audios]
@@ -502,7 +504,7 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
                f"Harga asli: {product.price_text or 'tidak terbaca'}"
                f"{f' (disebut sebagai {vague})' if vague else ''}\n"
                f"Variasi: hook {hook_style} - tata letak {layout} - suara "
-               f"{tts_meta.get('voice', voice_name)} ({gender}, {tts_meta.get('provider', '?')}) "
+               f"{tts_meta.get('voice', voice_name)} ({gender} via {tts_meta.get('provider', '?')}) "
                f"gaya {tts_meta.get('style', speech_style)}\n"
                f"{product.url}",
         score=None,

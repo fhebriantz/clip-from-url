@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from . import assets, db, usage, worker
+from . import assets, db, models_info, usage, worker
 from .services import gemini as gemini_service
 from .services import tts
 from .sources.product import UnsupportedURL, detect_source
@@ -60,6 +60,9 @@ class ProductRequest(BaseModel):
     duration: int = Field(default=30, ge=15, le=60)
     voice: str = "acak"
     hook_card: bool = True
+    # Kosong berarti ikut setelan .env. Cadangan tetap dipakai kalau pilihan gagal.
+    script_model: str = ""
+    tts_model: str = ""
     # Kalau diisi, gambar produk tidak diambil dari halaman marketplace.
     assets: list[AssetRef] = Field(default_factory=list, max_length=12)
     # Kalau diisi, menggantikan deskripsi hasil scraping.
@@ -77,6 +80,22 @@ class ProductRequest(BaseModel):
             detect_source(v)
         except UnsupportedURL as exc:
             raise ValueError(str(exc)) from exc
+        return v
+
+    @field_validator("script_model")
+    @classmethod
+    def _check_script_model(cls, v: str) -> str:
+        sah = [m["id"] for m in models_info.SCRIPT_MODELS]
+        if v and v not in sah:
+            raise ValueError(f"Model naskah harus salah satu dari: {', '.join(sah)}")
+        return v
+
+    @field_validator("tts_model")
+    @classmethod
+    def _check_tts_model(cls, v: str) -> str:
+        sah = [m["id"] for m in models_info.TTS_MODELS]
+        if v and v not in sah:
+            raise ValueError(f"Model suara harus salah satu dari: {', '.join(sah)}")
         return v
 
     @field_validator("voice")
@@ -115,6 +134,8 @@ def create_product(req: ProductRequest) -> dict[str, str]:
             "voice": req.voice,
             "hook_card": req.hook_card,
             "price_text": req.price_text,
+            "script_model": req.script_model,
+            "tts_model": req.tts_model,
             "assets": [a.model_dump() for a in req.assets],
             "description": req.description,
         },
@@ -177,6 +198,11 @@ def assets_cleanup() -> dict[str, Any]:
         "mb": round(hasil["bytes"] / 1024 / 1024, 2),
         "frame_dirapikan": hasil["frame_dirapikan"],
     }
+
+
+@app.get("/api/models")
+def get_models() -> dict[str, Any]:
+    return models_info.catalog()
 
 
 @app.get("/api/usage")

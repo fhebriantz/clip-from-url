@@ -17,13 +17,29 @@ class GeminiNotConfigured(RuntimeError):
     pass
 
 
+def make_client() -> genai.Client:
+    """Klien Gemini dengan retry bawaan SDK dimatikan.
+
+    SDK mengulang sendiri galat 429 dengan backoff panjang. Untuk kuota harian
+    yang habis, pengulangan itu tidak akan pernah berhasil dan hanya menahan job
+    - terukur 163 detik terbuang sebelum akhirnya pindah model. Retry ditangani
+    di lapisan ini saja, yang tahu bedanya "sibuk" dan "kuota habis".
+    """
+    return genai.Client(
+        api_key=GEMINI_API_KEY,
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(attempts=1)
+        ),
+    )
+
+
 def _client() -> genai.Client:
     if not GEMINI_API_KEY:
         raise GeminiNotConfigured(
             "GEMINI_API_KEY belum diisi. Salin .env.example jadi .env, "
             "lalu isi key dari https://aistudio.google.com/apikey"
         )
-    return genai.Client(api_key=GEMINI_API_KEY)
+    return make_client()
 
 
 # Model flash terbaru rutin menolak dengan 503 saat permintaan menumpuk, dan
@@ -49,15 +65,23 @@ def _record(model: str, resp, note: str = "") -> None:
                  note=note)
 
 
-def model_chain() -> list[str]:
+def model_chain(utama: str = "") -> list[str]:
     """Urutan model yang dicoba: utama dulu, lalu cadangan saat sibuk atau kuota habis."""
-    return _model_chain()
+    return _model_chain(utama)
 
 
-def _model_chain() -> list[str]:
-    chain = [GEMINI_MODEL]
-    chain += [m for m in _FALLBACKS if m != GEMINI_MODEL]
-    return chain
+def _dedupe(models: list[str]) -> list[str]:
+    """Buang duplikat tapi pertahankan urutannya."""
+    out: list[str] = []
+    for m in models:
+        if m and m not in out:
+            out.append(m)
+    return out
+
+
+def _model_chain(utama: str = "") -> list[str]:
+    """Model utama diikuti cadangannya. `utama` menimpa setelan .env."""
+    return _dedupe([utama or GEMINI_MODEL, GEMINI_MODEL, *_FALLBACKS])
 
 
 _SCRIPT_SCHEMA = {
@@ -147,7 +171,8 @@ Kalau deskripsi produk minim, fokus ke manfaat yang jelas dari nama produknya. J
 
 def write_product_script(product: dict, scenes: int, duration: int,
                          on_status: Callable[[str], None] | None = None,
-                         hook_style: str | None = None) -> dict:
+                         hook_style: str | None = None,
+                         model_override: str = "") -> dict:
     """Minta Gemini menulis naskah video promosi dari data produk."""
     client = _client()
     desc = (product.get("description") or "").strip()[:1500] or "(tidak tersedia)"
@@ -193,7 +218,8 @@ def write_product_script(product: dict, scenes: int, duration: int,
                           flush=True)
                     return _clean_script(resp.parsed or {}, scenes, vague, product.get("price"))
                 usage.record("naskah", model, 0, 0, ok=False, note=str(exc))
-                if code not in _RETRY_CODES or attempt == _ATTEMPTS_PER_MODEL:
+                # Kuota habis tidak akan pulih dengan menunggu; langsung pindah.
+                if code == 429 or code not in _RETRY_CODES or attempt == _ATTEMPTS_PER_MODEL:
                     break
                 if on_status:
                     on_status(f"{model} sibuk ({code}), coba lagi {int(delay)}s...")

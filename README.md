@@ -292,6 +292,20 @@ persis di scene pertama, sehingga penonton mendengar kalimat yang sama dua kali
 (kartu hook membacakan hook, lalu scene 1 mengulangnya). Diatasi dengan aturan
 eksplisit di prompt, bukan dengan mengembalikan thinking.
 
+### Memilih model per video
+
+Dua dropdown di UI: **model naskah** dan **model suara**. Kosong berarti mengikuti
+`.env`. Yang direkomendasikan diberi label, dan model yang kuotanya terdeteksi habis
+diberi label `kuota habis, pulih N jam lagi`.
+
+Status habis itu **kesimpulan dari catatan pemakaian sendiri**, bukan fakta dari
+Google: sebuah model dianggap habis kalau penolakan `429` terakhirnya lebih baru
+daripada keberhasilan terakhirnya dan terjadi kurang dari 24 jam lalu. Labelnya
+hilang sendiri setelah 24 jam, atau langsung begitu ada panggilan yang berhasil.
+
+Model berlabel habis **tetap bisa dipilih**. Rantai cadangan tetap berjalan, dan
+kuotanya bisa saja sudah pulih lebih cepat dari perkiraan.
+
 ### Rotasi model
 
 Kalau model utama menolak dengan `429` (kuota habis) atau `500`/`502`/`503`/`504`
@@ -353,8 +367,17 @@ Karena itu seluruh narasi diminta dalam **satu request**, lalu dipotong sendiri 
 jeda antar kalimat memakai `silencedetect`. Pemotongannya diverifikasi jatuh tepat
 di hening, bukan di tengah kata. Hemat request sekitar 5x.
 
-Kalau kuota tetap habis (`429`), narasi otomatis jatuh ke edge-tts supaya job tidak
-gagal. Mesin yang benar-benar terpakai dicatat di riwayat, jadi kamu tahu video mana
+Kalau model TTS utama menolak, narasi pindah ke model TTS berikutnya, dan baru
+jatuh ke edge-tts kalau semuanya gagal:
+
+```
+gemini-3.1-flash-tts-preview -> gemini-2.5-flash-preview-tts -> edge-tts
+```
+
+Galat `429` tidak diulang, langsung pindah model - kuota harian tidak akan pulih
+dengan menunggu. Retry bawaan SDK juga dimatikan karena mengulang `429` sendiri
+dengan backoff panjang; terukur 163 detik terbuang sebelum akhirnya pindah, kini
+0,5 detik. Mesin yang benar-benar terpakai dicatat di riwayat, jadi kamu tahu video mana
 yang memakai suara cadangan:
 
 ```
