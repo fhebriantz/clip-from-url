@@ -95,7 +95,7 @@ async function submit(form, endpoint, body, errKey) {
         ? detail.map((d) => d.msg.replace(/^Value error,\s*/, "")).join(", ")
         : (detail || "Gagal membuat job"));
     }
-    form.querySelector("input[type=url]").value = "";
+    form.querySelectorAll("input[type=url], input[type=text]").forEach((i) => { i.value = ""; });
   } catch (err) {
     errEl.textContent = err.message;
   } finally {
@@ -109,6 +109,7 @@ $("formProduct").addEventListener("submit", (e) => {
     url: $("pUrl").value.trim(),
     duration: Number($("pDuration").value),
     voice: $("pVoice").value,
+    price_text: $("pPrice").value.trim(),
   }, "product");
 });
 

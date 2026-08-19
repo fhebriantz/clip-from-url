@@ -18,7 +18,7 @@ import httpx
 
 from ..config import ASSETS_DIR, OUTPUT_DIR, WORK_DIR
 from ..services import gemini, tts
-from ..sources.product import _HEADERS, extract
+from ..sources.product import _HEADERS, extract, parse_price_input
 from ..tools import ensure_ffmpeg, ffprobe_duration, run_ffmpeg
 
 Report = Callable[[int, str], None]
@@ -39,6 +39,9 @@ RENDER_PARALLEL = max(1, min(3, (os.cpu_count() or 2) // 2))
 # kencang di pengukuran, tapi jelas membuang detail (59 KB vs 77 KB per scene
 # pada CRF yang sama).
 VIDEO_PRESET = "medium"
+
+# Seberapa jauh gambar membesar/mengecil sepanjang satu scene.
+ZOOM_RANGE = 0.12
 # Perkiraan dari pengukuran: narasi 8-18 kata plus jeda akhir memakan sekitar
 # 4,6-5,9 detik per scene tergantung suara dan panjang kalimat. Durasi akhir
 # karena itu meleset beberapa detik dari target - ini perkiraan, bukan jaminan.
@@ -123,6 +126,22 @@ def _wrap(text: str, width: int = 30) -> str:
     return "\n".join(textwrap.wrap(text, width=width)) or text
 
 
+def _zoom_expr(duration: float, idx: int) -> str:
+    """Ekspresi zoom berbasis nomor frame keluaran.
+
+    Akumulator `zoom` bawaan zoompan tidak bertambah saat d=1 - gambarnya diam
+    total (terukur PSNR ~68 dB antara frame awal dan akhir, alias tidak berubah).
+    Menghitung langsung dari `on` membuat gerakannya benar-benar jalan.
+
+    Arah zoom diselang-seling per scene supaya video dari satu gambar saja tidak
+    terlihat mengulang gerakan yang sama.
+    """
+    frames = max(1, int(duration * FPS))
+    if idx % 2 == 0:
+        return f"z='1+{ZOOM_RANGE}*on/{frames}'"
+    return f"z='{1 + ZOOM_RANGE}-{ZOOM_RANGE}*on/{frames}'"
+
+
 def _render_scene(image: Path, duration: float, caption: str, out: Path, work: Path, idx: int) -> None:
     """Satu scene: background blur, produk di tengah, zoom pelan, subtitle."""
     chain = [
@@ -130,7 +149,7 @@ def _render_scene(image: Path, duration: float, caption: str, out: Path, work: P
         "boxblur=30:2,eq=brightness=-0.10[bg]",
         f"[0:v]scale={int(W * 0.91)}:-1[fg]",
         "[bg][fg]overlay=(W-w)/2:(H-h)/2[base]",
-        "[base]zoompan=z='min(zoom+0.0008,1.15)':d=1:"
+        f"[base]zoompan={_zoom_expr(duration, idx)}:d=1:"
         f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={W}x{H}:fps={FPS}[zm]",
     ]
 
@@ -165,6 +184,15 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
 
     report(5, "Membaca halaman produk...")
     product = extract(url)
+
+    # TikTok Shop tidak pernah mengekspos harga, dan Shopee kadang juga tidak.
+    # Harga yang diketik pengguna selalu menang atas hasil ekstraksi.
+    manual = str(params.get("price_text") or "").strip()
+    if manual:
+        product.price_text, product.price = parse_price_input(manual)
+        if not product.price_text:
+            raise RuntimeError(f"Harga \"{manual}\" tidak dikenali. Contoh: 599000 atau Rp599.000")
+
     report(12, f"Produk: {product.title[:50]}")
 
     work = WORK_DIR / job_id

@@ -15,6 +15,7 @@ import json
 import re
 from dataclasses import dataclass, field, asdict
 from typing import Any
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 import httpx
 
@@ -27,6 +28,18 @@ _HEADERS = {
 }
 
 SHOPEE_IMG = "https://down-id.img.susercontent.com/file/"
+
+# TikTok Shop memblokir pengambilan halaman produk dengan captcha "Security Check",
+# termasuk lewat user-agent crawler. Satu-satunya data yang bisa diambil adalah
+# parameter og_info yang ikut tertanam di tautan share dari aplikasi.
+TIKTOK_HOSTS = (
+    "vt.tokopedia.com",
+    "shop-id.tokopedia.com",
+    "shop-sg.tokopedia.com",
+    "shop.tiktok.com",
+    "vt.tiktok.com",
+    "vm.tiktok.com",
+)
 
 
 @dataclass
@@ -49,13 +62,16 @@ class UnsupportedURL(ValueError):
 
 
 def detect_source(url: str) -> str:
-    low = url.lower()
-    if "shopee." in low:
+    host = (urlparse(url).hostname or "").lower()
+    # TikTok Shop dicek lebih dulu: host-nya ikut mengandung "tokopedia.com".
+    if any(host == h or host.endswith("." + h) for h in TIKTOK_HOSTS):
+        return "tiktok"
+    if "shopee." in host:
         return "shopee"
-    if "tokopedia.com" in low:
+    if host.endswith("tokopedia.com"):
         return "tokopedia"
     raise UnsupportedURL(
-        "URL harus dari shopee.co.id atau tokopedia.com. "
+        "URL harus dari shopee.co.id, tokopedia.com, atau TikTok Shop. "
         "Platform lain belum didukung."
     )
 
@@ -113,6 +129,16 @@ def _parse_rupiah(text: str) -> tuple[str, int | None]:
         if 1_000 <= value <= 500_000_000:
             return f"Rp{value:,}".replace(",", "."), value
     return "", None
+
+
+def parse_price_input(text: str) -> tuple[str, int | None]:
+    """Baca harga yang diketik pengguna. Menerima "599000" maupun "Rp599.000"."""
+    text = text.strip()
+    if not text:
+        return "", None
+    if "rp" not in text.lower():
+        text = "Rp" + text
+    return _parse_rupiah(text)
 
 
 # --------------------------------------------------------------------------- Shopee
@@ -191,10 +217,63 @@ def _tokopedia(url: str, html: str) -> Product:
     return p
 
 
+# ------------------------------------------------------------------ TikTok Shop
+
+def _resolve_share(url: str) -> str:
+    """Ikuti redirect tautan pendek supaya parameter og_info ikut terbaca."""
+    if "og_info=" in url:
+        return url
+    with httpx.Client(headers=_HEADERS, follow_redirects=True, timeout=30.0) as c:
+        try:
+            return str(c.get(url).url)
+        except httpx.RequestError as exc:
+            raise RuntimeError(f"Gagal membuka tautan TikTok Shop: {exc}") from exc
+
+
+def _tiktok_image_1080(url: str) -> str:
+    """Naikkan ukuran gambar dari thumbnail 260px ke 1080px.
+
+    Parameter tanda tangan di query tetap sah setelah ukurannya diganti, jadi
+    tidak perlu memakai gambar thumbnail yang terlalu kecil untuk video.
+    """
+    return re.sub(r"(~tplv-[a-z0-9]+-resize-webp):\d+:\d+", r"\1:1080:1080", url)
+
+
+def _strip_tracking(url: str) -> str:
+    """Buang seluruh query: tautan share TikTok memuat identitas pembaginya."""
+    parts = urlparse(url)
+    return urlunparse((parts.scheme, parts.netloc, parts.path, "", "", ""))
+
+
+def _tiktok(url: str) -> Product:
+    resolved = _resolve_share(url)
+    raw = (parse_qs(urlparse(resolved).query).get("og_info") or [""])[0]
+    if not raw:
+        raise RuntimeError(
+            "Tautan TikTok Shop ini tidak memuat data produk. Halaman produknya "
+            "sendiri diblokir captcha, jadi yang bisa dipakai hanya tautan share "
+            "dari aplikasi TikTok (tombol Bagikan), bukan URL yang diketik manual."
+        )
+    try:
+        info = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Data produk di tautan TikTok Shop tidak bisa dibaca.") from exc
+
+    p = Product(url=_strip_tracking(resolved), source="tiktok")
+    p.title = str(info.get("title") or "").strip()
+    image = str(info.get("image") or "").strip()
+    if image:
+        p.images.append(_tiktok_image_1080(image))
+    return p
+
+
 def extract(url: str) -> Product:
     source = detect_source(url)
-    html = _fetch(url)
-    product = _shopee(url, html) if source == "shopee" else _tokopedia(url, html)
+    if source == "tiktok":
+        product = _tiktok(url)
+    else:
+        html = _fetch(url)
+        product = _shopee(url, html) if source == "shopee" else _tokopedia(url, html)
     if not product.title:
         raise RuntimeError(
             "Judul produk tidak terbaca. Halaman kemungkinan diblokir atau "

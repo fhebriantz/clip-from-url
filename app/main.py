@@ -43,6 +43,8 @@ class ProductRequest(BaseModel):
     url: str = Field(min_length=8)
     duration: int = Field(default=30, ge=15, le=60)
     voice: str = "pria"
+    # TikTok Shop tidak pernah mengekspos harga; Shopee kadang juga tidak.
+    price_text: str = Field(default="", max_length=32)
 
     @field_validator("url")
     @classmethod
@@ -78,7 +80,9 @@ def create_product(req: ProductRequest) -> dict[str, str]:
     if not GEMINI_API_KEY:
         raise HTTPException(400, "GEMINI_API_KEY belum diisi di berkas .env")
     job_id = db.create_job(
-        "product", req.url, {"duration": req.duration, "voice": req.voice}
+        "product",
+        req.url,
+        {"duration": req.duration, "voice": req.voice, "price_text": req.price_text},
     )
     return {"job_id": job_id}
 

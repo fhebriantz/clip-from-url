@@ -1,7 +1,7 @@
 # clip-from-url
 
-Tools lokal yang mengubah URL produk **Shopee** atau **Tokopedia** menjadi video
-promosi vertikal 9:16, lengkap dengan narasi suara, subtitle, dan caption siap
+Tools lokal yang mengubah URL produk **Shopee**, **Tokopedia**, atau
+**TikTok Shop** menjadi video promosi vertikal 9:16, lengkap dengan narasi suara, subtitle, dan caption siap
 posting. Jalan sepenuhnya di komputer sendiri: tanpa server, tanpa biaya bulanan.
 
 ## Menjalankan
@@ -51,12 +51,34 @@ Gadis (wanita).
 
 ## Apa yang bisa diambil per platform
 
-| Data | Tokopedia | Shopee |
-|---|---|---|
-| Judul | ya | ya |
-| Gambar | ya | ya |
-| Deskripsi | sebagian | ya |
-| Harga | ya | **tidak langsung** |
+| Data | Tokopedia | Shopee | TikTok Shop |
+|---|---|---|---|
+| Judul | ya | ya | ya |
+| Gambar | ya (banyak) | ya (banyak) | **1 saja** |
+| Deskripsi | sebagian | ya | tidak |
+| Harga | ya | **tidak langsung** | **tidak** |
+
+Kalau harga tidak terbaca, isi kolom **Harga** di UI (boleh `599000` atau `Rp599.000`).
+Nilai yang diketik selalu menang atas hasil ekstraksi. Kalau dikosongkan dan memang
+tidak terbaca, naskah dibuat tanpa menyebut harga.
+
+### TikTok Shop
+
+Halaman produknya diblokir captcha "Security Check" - termasuk lewat user-agent
+crawler, yang hanya membalas OG tag generik milik TikTok Shop, bukan data produk.
+
+Karena itu satu-satunya sumber data adalah parameter `og_info` yang ikut tertanam di
+**tautan share dari aplikasi** (tombol Bagikan). URL yang diketik manual tidak akan
+berhasil. Dari situ didapat judul dan satu gambar, yang ukurannya dinaikkan dari
+thumbnail 260px ke 1080px.
+
+Konsekuensinya video TikTok Shop dibuat dari satu gambar saja, jadi arah zoom
+diselang-seling antar scene supaya tidak terlihat mengulang gerakan yang sama.
+
+Tautan share TikTok memuat identitas pembagi (`user_id`, `device_id`, `unique_id`).
+Seluruh query dibuang sebelum URL disimpan.
+
+### Shopee
 
 Shopee tidak merender harga di sisi server - seluruh field harganya `null` di HTML.
 Sebagai gantinya harga dicari dari teks deskripsi penjual (pola `Rp...`), yang pada

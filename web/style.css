@@ -86,6 +86,12 @@ button {
 }
 button:disabled { opacity: .5; cursor: not-allowed; }
 
+.opt { font-weight: 400; opacity: .75; }
+input[type=text] {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 10px 12px; font: inherit; width: 100%;
+}
+
 .error { color: var(--err); font-size: 13px; }
 .error:empty { display: none; }
 .empty { color: var(--muted); font-size: 13px; }
