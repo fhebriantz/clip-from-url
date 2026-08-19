@@ -6,7 +6,7 @@ import threading
 import webbrowser
 
 from app.config import PORT, ensure_dirs, setup_console
-from app.tools import add_bin_to_path, ensure_deno, ensure_ffmpeg, find_binary
+from app.tools import add_bin_to_path, ensure_ffmpeg, find_binary
 
 
 def _fetch(label: str, fn) -> bool:
@@ -35,12 +35,6 @@ def prepare() -> bool:
             print("[ERROR] Install FFmpeg manual, lalu jalankan lagi.")
             return False
 
-    # yt-dlp memerlukan runtime JavaScript untuk memecahkan tanda tangan YouTube.
-    # Tanpa ini, unduhan dijawab HTTP 403.
-    if find_binary("deno") is None:
-        if not _fetch("Deno", ensure_deno):
-            print("[ERROR] Tanpa Deno, unduhan dari YouTube kemungkinan besar gagal.")
-            return False
     return True
 
 

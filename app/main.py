@@ -39,22 +39,6 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="clip-from-url", lifespan=lifespan)
 
 
-class HighlightRequest(BaseModel):
-    url: str = Field(min_length=8)
-    count: int = Field(default=3, ge=1, le=10)
-    duration: float = Field(default=15, ge=3, le=90)
-    vertical: bool = True
-    keep_source: bool = False
-
-    @field_validator("url")
-    @classmethod
-    def _check_url(cls, v: str) -> str:
-        v = v.strip()
-        if not v.startswith(("http://", "https://")):
-            raise ValueError("URL harus diawali http:// atau https://")
-        return v
-
-
 class ProductRequest(BaseModel):
     url: str = Field(min_length=8)
     duration: int = Field(default=30, ge=15, le=60)
@@ -84,27 +68,9 @@ class ProductRequest(BaseModel):
 def health() -> dict[str, Any]:
     return {
         "ffmpeg": find_binary("ffmpeg") is not None,
-        "deno": find_binary("deno") is not None,
         "gemini_key": bool(GEMINI_API_KEY),
         "model": GEMINI_MODEL,
     }
-
-
-@app.post("/api/jobs/highlight")
-def create_highlight(req: HighlightRequest) -> dict[str, str]:
-    if not GEMINI_API_KEY:
-        raise HTTPException(400, "GEMINI_API_KEY belum diisi di berkas .env")
-    job_id = db.create_job(
-        "highlight",
-        req.url,
-        {
-            "count": req.count,
-            "duration": req.duration,
-            "vertical": req.vertical,
-            "keep_source": req.keep_source,
-        },
-    )
-    return {"job_id": job_id}
 
 
 @app.post("/api/jobs/product")

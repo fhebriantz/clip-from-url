@@ -18,20 +18,6 @@ from .config import BIN_DIR, IS_WINDOWS
 _WIN_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
 _LINUX_URL = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
 
-# yt-dlp butuh runtime JavaScript untuk memecahkan tanda tangan "n" YouTube.
-# Tanpa itu URL stream ditolak dengan HTTP 403. Deno adalah satu-satunya runtime
-# yang diaktifkan yt-dlp secara default, dan bentuknya satu binary.
-_DENO_BASE = "https://github.com/denoland/deno/releases/latest/download"
-_DENO_ASSET = {
-    ("win32", "amd64"): "deno-x86_64-pc-windows-msvc.zip",
-    ("win32", "x86_64"): "deno-x86_64-pc-windows-msvc.zip",
-    ("linux", "x86_64"): "deno-x86_64-unknown-linux-gnu.zip",
-    ("linux", "amd64"): "deno-x86_64-unknown-linux-gnu.zip",
-    ("linux", "aarch64"): "deno-aarch64-unknown-linux-gnu.zip",
-    ("linux", "arm64"): "deno-aarch64-unknown-linux-gnu.zip",
-    ("darwin", "x86_64"): "deno-x86_64-apple-darwin.zip",
-    ("darwin", "arm64"): "deno-aarch64-apple-darwin.zip",
-}
 
 _cache: dict[str, Path] = {}
 
@@ -57,7 +43,7 @@ def find_binary(name: str) -> Path | None:
 
 
 def add_bin_to_path() -> None:
-    """Taruh bin/ di depan PATH proses ini supaya yt-dlp menemukan deno & ffmpeg."""
+    """Taruh bin/ di depan PATH proses ini supaya FFmpeg hasil unduhan terpakai."""
     current = os.environ.get("PATH", "")
     entry = str(BIN_DIR)
     if entry not in current.split(os.pathsep):
@@ -127,45 +113,6 @@ def download_ffmpeg(on_progress=None) -> Path:
 def ensure_ffmpeg(on_progress=None) -> Path:
     return find_binary("ffmpeg") or download_ffmpeg(on_progress)
 
-
-def download_deno(on_progress=None) -> Path:
-    """Unduh binary Deno ke bin/. Dipanggil hanya bila belum ada."""
-    machine = platform.machine().lower()
-    asset = _DENO_ASSET.get((sys.platform, machine))
-    if not asset:
-        raise RuntimeError(
-            f"Tidak ada build Deno siap pakai untuk {sys.platform}/{machine}. "
-            "Install Deno manual dari https://deno.land lalu pastikan ada di PATH."
-        )
-
-    BIN_DIR.mkdir(parents=True, exist_ok=True)
-    archive = BIN_DIR / "deno-dl.zip"
-    with httpx.stream("GET", f"{_DENO_BASE}/{asset}", follow_redirects=True, timeout=180.0) as r:
-        r.raise_for_status()
-        total = int(r.headers.get("content-length", 0))
-        done = 0
-        with archive.open("wb") as f:
-            for chunk in r.iter_bytes(1 << 20):
-                f.write(chunk)
-                done += len(chunk)
-                if on_progress and total:
-                    on_progress(done / total)
-
-    with zipfile.ZipFile(archive) as z:
-        z.extractall(BIN_DIR)
-    archive.unlink(missing_ok=True)
-
-    target = BIN_DIR / _exe("deno")
-    if not target.is_file():
-        raise RuntimeError("Arsip Deno tidak berisi binary yang diharapkan.")
-    if not IS_WINDOWS:
-        target.chmod(0o755)
-    _cache.clear()
-    return target
-
-
-def ensure_deno(on_progress=None) -> Path:
-    return find_binary("deno") or download_deno(on_progress)
 
 
 def ffprobe_duration(path: Path) -> float:

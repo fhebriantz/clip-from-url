@@ -1,27 +1,11 @@
 const $ = (id) => document.getElementById(id);
 
 const STATUS_LABEL = { queued: "antri", running: "proses", done: "selesai", failed: "gagal" };
-const KIND_LABEL = { highlight: "Highlight", product: "Video produk" };
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
-
-function fmt(sec) {
-  const s = Math.max(0, Math.round(sec));
-  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-}
-
-/* ---------------------------------------------------------------- tab */
-
-document.querySelectorAll(".tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
-    document.querySelectorAll("[id^=panel-]").forEach((panel) =>
-      panel.classList.toggle("hidden", panel.id !== `panel-${btn.dataset.tab}`));
-  });
-});
 
 /* ------------------------------------------------------------- health */
 
@@ -30,7 +14,6 @@ async function checkHealth() {
     const h = await (await fetch("/api/health")).json();
     const parts = [];
     parts.push(h.ffmpeg ? '<span class="good">FFmpeg</span>' : '<span class="bad">FFmpeg hilang</span>');
-    parts.push(h.deno ? '<span class="good">Deno</span>' : '<span class="bad">Deno hilang (unduhan YouTube akan gagal)</span>');
     parts.push(h.gemini_key
       ? `<span class="good">${esc(h.model)}</span>`
       : '<span class="bad">GEMINI_API_KEY kosong (isi .env)</span>');
@@ -42,11 +25,8 @@ async function checkHealth() {
 
 /* --------------------------------------------------------------- render */
 
-function renderClip(c, kind) {
-  const meta = kind === "product"
-    ? `${(c.end_s - c.start_s).toFixed(0)} detik`
-    : `${fmt(c.start_s)} - ${fmt(c.end_s)} &middot; ${(c.end_s - c.start_s).toFixed(1)}s`
-      + (c.score != null ? ` &middot; skor ${Math.round(c.score)}` : "");
+function renderClip(c) {
+  const meta = `${(c.end_s - c.start_s).toFixed(0)} detik`;
   return `<div class="clip">
     <video src="/api/clips/${esc(c.id)}/file" controls preload="metadata"></video>
     <div class="clip-label">${esc(c.label) || "Klip"}</div>
@@ -64,14 +44,11 @@ function renderJob(j) {
         <div class="job-title">${esc(j.title || "Memuat...")}</div>
         <div class="job-url">${esc(j.source_url)}</div>
       </div>
-      <div class="badges">
-        <span class="badge kind">${esc(KIND_LABEL[j.kind] || j.kind)}</span>
-        <span class="badge ${esc(j.status)}">${STATUS_LABEL[j.status] || esc(j.status)}</span>
-      </div>
+      <span class="badge ${esc(j.status)}">${STATUS_LABEL[j.status] || esc(j.status)}</span>
     </div>
     ${showBar ? `<div class="bar"><div style="width:${j.progress}%"></div></div>` : ""}
     ${j.error ? `<div class="error">${esc(j.error)}</div>` : `<div class="msg">${esc(j.message)}</div>`}
-    ${j.clips.length ? `<div class="clips">${j.clips.map((c) => renderClip(c, j.kind)).join("")}</div>` : ""}
+    ${j.clips.length ? `<div class="clips">${j.clips.map(renderClip).join("")}</div>` : ""}
     <div class="job-actions">
       <button class="link-btn" data-del="${esc(j.id)}">Hapus job &amp; berkasnya</button>
     </div>
@@ -125,16 +102,6 @@ async function submit(form, endpoint, body, errKey) {
     btn.disabled = false;
   }
 }
-
-$("formHighlight").addEventListener("submit", (e) => {
-  e.preventDefault();
-  submit(e.target, "/api/jobs/highlight", {
-    url: $("hUrl").value.trim(),
-    count: Number($("hCount").value),
-    duration: Number($("hDuration").value),
-    vertical: $("hVertical").checked,
-  }, "highlight");
-});
 
 $("formProduct").addEventListener("submit", (e) => {
   e.preventDefault();

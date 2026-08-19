@@ -42,14 +42,6 @@ h1 span { color: var(--muted); font-weight: 400; }
 
 main { max-width: 860px; margin: 0 auto; padding: 24px; }
 
-.tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-.tab {
-  background: transparent; color: var(--muted);
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: 9px 16px; font: 600 13px/1 inherit; cursor: pointer;
-}
-.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.hidden { display: none; }
 
 .card {
   background: var(--surface);
@@ -109,9 +101,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .job-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .job-title { font-weight: 600; font-size: 14px; word-break: break-word; }
 .job-url { font-size: 12px; color: var(--muted); word-break: break-all; }
-
-.badges { display: flex; gap: 6px; flex-shrink: 0; }
-.badge.kind { color: var(--muted); }
 
 .badge {
   font-size: 11px; padding: 3px 9px; border-radius: 999px;

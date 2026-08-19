@@ -13,40 +13,15 @@
 </header>
 
 <main>
-  <nav class="tabs">
-    <button class="tab active" data-tab="highlight">AI Auto-Highlighting</button>
-    <button class="tab" data-tab="product">URL to Video</button>
-  </nav>
-
-  <section class="card" id="panel-highlight">
-    <p class="hint">Tempel URL YouTube atau TikTok. Gemini memilih momen terbaik, FFmpeg memotongnya.</p>
-    <form id="formHighlight">
-      <label>URL video
-        <input id="hUrl" type="url" placeholder="https://www.youtube.com/watch?v=..." required>
-      </label>
-      <div class="row">
-        <label>Jumlah klip
-          <input id="hCount" type="number" value="3" min="1" max="10">
-        </label>
-        <label>Durasi per klip (detik)
-          <input id="hDuration" type="number" value="15" min="3" max="90">
-        </label>
-      </div>
-      <label class="check">
-        <input id="hVertical" type="checkbox" checked>
-        <span>Crop otomatis ke 9:16 (1080x1920)</span>
-      </label>
-      <button type="submit">Proses</button>
-      <div class="error" data-err="highlight"></div>
-    </form>
-  </section>
-
-  <section class="card hidden" id="panel-product">
+  <section class="card">
+    <h2>URL produk jadi video</h2>
     <p class="hint">Tempel URL produk Shopee atau Tokopedia. Gambar dan deskripsi diambil otomatis,
-      Gemini menulis naskahnya, lalu dibacakan dan disusun jadi video vertikal.</p>
+      Gemini menulis naskahnya, lalu dibacakan dan disusun jadi video vertikal 9:16.</p>
+
     <form id="formProduct">
       <label>URL produk
-        <input id="pUrl" type="url" placeholder="https://shopee.co.id/product/... atau https://www.tokopedia.com/..." required>
+        <input id="pUrl" type="url" required
+               placeholder="https://shopee.co.id/product/... atau https://www.tokopedia.com/...">
       </label>
       <div class="row">
         <label>Target durasi (detik)

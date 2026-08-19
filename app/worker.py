@@ -1,19 +1,53 @@
 """Worker antrian: satu thread latar mengambil job satu per satu."""
 from __future__ import annotations
 
+import re
 import threading
 import time
 import traceback
 
 from . import db
-from .pipeline import highlight, product_video
+from .pipeline import product_video
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
 
 
-def _report(job_id: str):
+class _PhaseTimer:
+    """Catat berapa lama tiap tahap berjalan, berdasarkan perubahan pesan progres.
+
+    Pesan berulang (mis. progres unduhan) digabung ke tahap yang sama supaya
+    ringkasannya tetap terbaca.
+    """
+
+    def __init__(self) -> None:
+        self.marks: list[tuple[str, float]] = []
+        self.start = time.monotonic()
+
+    @staticmethod
+    def _label(message: str) -> str:
+        # "Mengunduh video... 42%" dan "... 87%" dianggap satu tahap.
+        return re.sub(r"[.\s]*\d+%?\s*$", "", message).strip() or message
+
+    def mark(self, message: str) -> None:
+        label = self._label(message)
+        if self.marks and self.marks[-1][0] == label:
+            return
+        self.marks.append((label, time.monotonic()))
+
+    def summary(self) -> list[tuple[str, float]]:
+        end = time.monotonic()
+        out = []
+        for i, (label, t) in enumerate(self.marks):
+            nxt = self.marks[i + 1][1] if i + 1 < len(self.marks) else end
+            out.append((label, nxt - t))
+        return out
+
+
+def _report(job_id: str, timer: "_PhaseTimer"):
     def fn(progress: int, message: str) -> None:
+        if message:
+            timer.mark(message)
         db.update_job(job_id, progress=max(0, min(100, progress)), message=message)
     return fn
 
@@ -24,20 +58,20 @@ def _adder(job_id: str):
     return fn
 
 
-def _process(job: dict) -> None:
+def _process(job: dict) -> _PhaseTimer:
     job_id = job["id"]
-    report = _report(job_id)
+    timer = _PhaseTimer()
+    report = _report(job_id, timer)
     try:
-        runners = {"highlight": highlight.run, "product": product_video.run}
-        runner = runners.get(job["kind"])
-        if runner is None:
+        if job["kind"] != "product":
             raise RuntimeError(f"Jenis job belum didukung: {job['kind']}")
-        title = runner(job_id, job["source_url"], job["params"], report, _adder(job_id))
+        title = product_video.run(job_id, job["source_url"], job["params"], report, _adder(job_id))
         db.update_job(job_id, status="done", progress=100, title=title,
                       message="Selesai", error=None)
     except Exception as exc:  # noqa: BLE001 - worker tidak boleh mati karena satu job
         traceback.print_exc()
         db.update_job(job_id, status="failed", message="Gagal", error=str(exc))
+    return timer
 
 
 def _loop() -> None:
@@ -47,9 +81,13 @@ def _loop() -> None:
             _stop.wait(1.0)
             continue
         print(f"[worker] mulai job {job['id']} ({job['kind']})", flush=True)
-        started = time.time()
-        _process(job)
-        print(f"[worker] selesai job {job['id']} dalam {time.time() - started:.1f}s", flush=True)
+        started = time.monotonic()
+        timer = _process(job)
+        total = time.monotonic() - started
+        print(f"[worker] selesai job {job['id']} dalam {total:.1f}s", flush=True)
+        for label, secs in timer.summary():
+            share = secs / total * 100 if total else 0
+            print(f"[waktu]   {secs:6.1f}s  {share:4.1f}%  {label}", flush=True)
 
 
 def start() -> None:

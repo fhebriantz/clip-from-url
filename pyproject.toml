@@ -1,18 +1,14 @@
 [project]
 name = "clip-from-url"
 version = "0.1.0"
-description = "Local tool: AI auto-highlighting & product-to-video generator"
+description = "Local tool: turn Shopee/Tokopedia product URLs into vertical promo videos"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
-    "yt-dlp>=2024.12.13",
     "google-genai>=0.8",
     "python-dotenv>=1.0",
     "httpx>=0.27",
-    # Dibutuhkan yt-dlp untuk mendekripsi cookie Chrome/Brave/Edge di Linux
-    # (cookie-nya dikunci lewat keyring lewat D-Bus).
-    "secretstorage>=3.3; sys_platform == 'linux'",
     "edge-tts>=7.2.8",
 ]
 

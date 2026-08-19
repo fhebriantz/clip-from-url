@@ -22,12 +22,8 @@ IS_WINDOWS = sys.platform == "win32"
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
-COOKIES_FROM_BROWSER = os.getenv("YTDLP_COOKIES_FROM_BROWSER", "").strip()
 PORT = int(os.getenv("PORT", "8765"))
 
-# Resolusi proxy yang dikirim ke Gemini. Kecil = murah & cepat; potongan
-# final tetap diambil dari file resolusi penuh.
-ANALYSIS_HEIGHT = 360
 
 
 def setup_console() -> None:
