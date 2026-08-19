@@ -405,10 +405,18 @@ Terukur di mesin 8 core untuk video 4 scene:
 |---|---|---|
 | Narasi TTS | ~9,1s (berurutan) | ~2,4s |
 | Render scene | ~18,6s | ~8,7s |
+| Penggabungan akhir | ~5,9s | **~0,3s** |
 
-Sisa waktu job hampir seluruhnya menunggu Gemini menulis naskah, yang di luar
-kendali aplikasi dan bisa berayun dari 20 detik sampai lebih dari 100 detik kalau
-model sedang sibuk.
+Penggabungan akhir menyalin stream video apa adanya, tidak meng-encode ulang. Tiap
+potongan sudah dibuat dengan setelan identik (h264 High 4.0, 1080x1920, yuv420p,
+SAR 1:1, 30 fps) - diverifikasi sama persis untuk kartu hook, scene dari gambar,
+maupun scene dari klip video. Hasilnya bahkan sedikit lebih kecil karena tidak ada
+kerusakan encode generasi kedua. Kalau suatu saat ada potongan berparameter beda,
+aplikasi otomatis kembali meng-encode ulang daripada menghasilkan berkas rusak.
+
+Sisa waktu job hampir seluruhnya menunggu Gemini, yang di luar kendali aplikasi dan
+bisa berayun dari 20 detik sampai lebih dari 100 detik kalau model sedang sibuk.
+Dari job 80 detik, sekitar 80% adalah menunggu API.
 
 ## Catatan
 
