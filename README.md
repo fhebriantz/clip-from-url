@@ -162,6 +162,41 @@ postingan tetap terbuka dengan tampilan yang sama persis, padahal frame pertama
 yang paling menentukan penonton lanjut atau scroll. Bisa dimatikan lewat centang
 di UI.
 
+## Biaya
+
+Terukur dari pemakaian nyata, bukan perkiraan kasar:
+
+| Komponen | Token | Biaya per video |
+|---|---|---|
+| Naskah (`gemini-3.6-flash`, thinking `low`) | 795 in / 250 out | $0,0015 |
+| Suara (`gemini-2.5-flash-preview-tts`) | 90 in / 425 audio out | $0,0043 |
+| **Total** | | **$0,0058** |
+
+Untuk 10 video sehari: sekitar **$1,75/bulan**, atau **$2,27/bulan** dengan cadangan
+30% untuk pengulangan saat model sibuk.
+
+Kalau memakai `gemini-3.1-flash-tts-preview` (tarif audio dua kali lipat), biayanya
+naik jadi sekitar $3,04/bulan.
+
+Audio dihitung **25 token per detik** - angka ini diukur langsung, tidak tercantum
+di dokumentasi.
+
+### Kenapa thinking disetel `low`
+
+Dengan penalaran bawaan, model menghabiskan ~1.500 token thinking untuk menulis 4
+kalimat promosi - **84% biaya naskah habis di situ**. Menyetelnya ke `low` membuat
+thinking jadi 0 token dan biaya naskah turun **76%** ($0,0071 menjadi $0,0015).
+
+Efek sampingnya sempat terlihat: naskah versi `low` menulis hook yang diulang lagi
+persis di scene pertama, sehingga penonton mendengar kalimat yang sama dua kali
+(kartu hook membacakan hook, lalu scene 1 mengulangnya). Diatasi dengan aturan
+eksplisit di prompt, bukan dengan mengembalikan thinking.
+
+### Batas tier gratis
+
+Pesan galat kuota menyebut **20 request per hari per model**. Satu video memakai 2
+request (satu naskah, satu narasi), jadi 10 video sehari masih muat tanpa bayar.
+
 ## Suara narator
 
 Narasi memakai **Gemini TTS**, bukan edge-tts. Alasannya edge-tts hanya punya dua

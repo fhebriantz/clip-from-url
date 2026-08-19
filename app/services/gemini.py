@@ -9,7 +9,7 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
-from ..config import GEMINI_API_KEY, GEMINI_MODEL
+from ..config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_THINKING
 
 
 class GeminiNotConfigured(RuntimeError):
@@ -75,6 +75,17 @@ HOOK_STYLES: dict[str, str] = {
 }
 
 
+def _script_config(with_thinking: bool = True) -> types.GenerateContentConfig:
+    kwargs: dict = {
+        "response_mime_type": "application/json",
+        "response_schema": _SCRIPT_SCHEMA,
+        "temperature": 0.9,
+    }
+    if with_thinking and GEMINI_THINKING and GEMINI_THINKING != "default":
+        kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=GEMINI_THINKING)
+    return types.GenerateContentConfig(**kwargs)
+
+
 _SCRIPT_PROMPT = """Kamu penulis naskah video afiliasi untuk TikTok dan Reels, audiens Indonesia dan Malaysia.
 
 Tulis naskah video vertikal berdurasi sekitar {duration} detik untuk produk berikut.
@@ -89,7 +100,11 @@ Gaya hook yang WAJIB dipakai kali ini: {hook_style}
 Buat TEPAT {scenes} scene. Aturan:
 - Field `hook` dan scene pertama harus mengikuti gaya hook di atas, jangan
   memakai gaya lain. Jangan basa-basi dan jangan menyapa penonton.
-- `hook` maksimal 8 kata dan harus enak dibaca sebagai teks besar di layar.
+- `hook` maksimal 8 kata, tanpa titik di akhir, dan harus enak dibaca sebagai
+  teks besar di layar.
+- Narasi scene pertama HARUS kalimat yang berbeda dari `hook` dan tidak boleh
+  mengulang kata-katanya. Hook sudah dibacakan lebih dulu sebagai kartu pembuka,
+  jadi mengulangnya membuat penonton mendengar kalimat yang sama dua kali.
 - Narasi memakai bahasa Indonesia sehari-hari yang santai, seperti ngobrol.
   Hindari bahasa iklan kaku seperti "produk berkualitas tinggi".
 - Setiap narration 8-18 kata, satu kalimat, enak dibaca mesin text-to-speech.
@@ -135,19 +150,21 @@ def write_product_script(product: dict, scenes: int, duration: int,
         for attempt in range(1, _ATTEMPTS_PER_MODEL + 1):
             try:
                 resp = client.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=_SCRIPT_SCHEMA,
-                        temperature=0.9,
-                    ),
+                    model=model, contents=prompt, config=_script_config()
                 )
                 return _clean_script(resp.parsed or {}, scenes, vague,
                                      product.get("price"))
             except (genai_errors.ServerError, genai_errors.ClientError) as exc:
                 last = exc
                 code = getattr(exc, "code", None)
+                if code == 400 and "thinking" not in str(exc).lower():
+                    raise
+                if code == 400:
+                    # Model ini tidak menerima pengaturan thinking; ulangi tanpa itu.
+                    resp = client.models.generate_content(
+                        model=model, contents=prompt,
+                        config=_script_config(with_thinking=False))
+                    return _clean_script(resp.parsed or {}, scenes, vague, product.get("price"))
                 if code not in _RETRY_CODES or attempt == _ATTEMPTS_PER_MODEL:
                     break
                 if on_status:

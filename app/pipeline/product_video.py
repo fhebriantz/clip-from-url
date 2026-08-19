@@ -17,7 +17,7 @@ from typing import Callable
 
 import httpx
 
-from ..config import ASSETS_DIR, OUTPUT_DIR, WORK_DIR
+from ..config import ASSETS_DIR, OUTPUT_DIR, TTS_PROVIDER, WORK_DIR
 from ..services import gemini, tts
 from ..sources.product import _HEADERS, extract, parse_price_input, price_vague
 from ..tools import ensure_ffmpeg, ffprobe_duration, run_ffmpeg
@@ -56,10 +56,16 @@ HOOK_CARD_SECONDS = 2.6
 
 # Hanya dipakai kalau jatuh ke cadangan edge-tts; tempo Gemini diatur lewat gaya.
 TTS_RATES = ("+8%", "+12%", "+16%")
-# Perkiraan dari pengukuran: narasi 8-18 kata plus jeda akhir memakan sekitar
-# 4,6-5,9 detik per scene tergantung suara dan panjang kalimat. Durasi akhir
-# karena itu meleset beberapa detik dari target - ini perkiraan, bukan jaminan.
-SECONDS_PER_SCENE = 5.0
+# Perkiraan panjang satu scene setelah dinarasikan. Gemini TTS bicara jauh lebih
+# lambat daripada edge-tts - terukur sekitar 7 detik per scene dibanding 5 detik -
+# jadi angkanya beda per mesin suara. Ini perkiraan, bukan jaminan: durasi akhir
+# tetap bisa meleset beberapa detik dari target.
+SECONDS_PER_SCENE_EDGE = 5.0
+SECONDS_PER_SCENE_GEMINI = 7.0
+
+
+def _seconds_per_scene() -> float:
+    return SECONDS_PER_SCENE_GEMINI if TTS_PROVIDER == "gemini" else SECONDS_PER_SCENE_EDGE
 
 
 def _font() -> Path | None:
@@ -311,11 +317,12 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     images = _download_images(product.images, work / "img", report)
 
     # Jumlah scene mengikuti target durasi, bukan jumlah gambar: satu scene
-    # rata-rata SECONDS_PER_SCENE detik setelah dinarasikan.
+    # rata-rata beberapa detik setelah dinarasikan (lihat _seconds_per_scene).
     # Gambar diputar ulang kalau scene lebih banyak, jadi jumlah gambar tidak
     # membatasi durasi video.
+    per_scene = _seconds_per_scene()
     budget = target - (HOOK_CARD_SECONDS if use_card else 0)
-    scene_count = max(2, min(round(budget / SECONDS_PER_SCENE), MAX_SCENES))
+    scene_count = max(2, min(round(budget / per_scene), MAX_SCENES))
     report(35, "Menulis naskah dengan Gemini...")
     script = gemini.write_product_script(
         product.as_dict(), scene_count, target,
