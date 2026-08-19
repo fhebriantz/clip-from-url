@@ -4,14 +4,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import re
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from . import db, usage, worker
+from . import assets, db, usage, worker
 from .services import tts
 from .sources.product import UnsupportedURL, detect_source
 from .config import (
@@ -29,6 +30,7 @@ from .tools import add_bin_to_path, find_binary
 async def lifespan(_: FastAPI):
     setup_console()
     ensure_dirs()
+    assets.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     add_bin_to_path()
     db.init()
     worker.start()
@@ -44,6 +46,10 @@ class ProductRequest(BaseModel):
     duration: int = Field(default=30, ge=15, le=60)
     voice: str = "acak"
     hook_card: bool = True
+    # Kalau diisi, gambar produk tidak diambil dari halaman marketplace.
+    assets: list[str] = Field(default_factory=list, max_length=12)
+    # Kalau diisi, menggantikan deskripsi hasil scraping.
+    description: str = Field(default="", max_length=4000)
     # TikTok Shop tidak pernah mengekspos harga; Shopee kadang juga tidak.
     price_text: str = Field(default="", max_length=32)
 
@@ -57,6 +63,14 @@ class ProductRequest(BaseModel):
             detect_source(v)
         except UnsupportedURL as exc:
             raise ValueError(str(exc)) from exc
+        return v
+
+    @field_validator("assets")
+    @classmethod
+    def _check_assets(cls, v: list[str]) -> list[str]:
+        for a in v:
+            if not re.fullmatch(r"[0-9a-f]{6,32}", a):
+                raise ValueError(f"ID aset tidak sah: {a}")
         return v
 
     @field_validator("voice")
@@ -89,9 +103,37 @@ def create_product(req: ProductRequest) -> dict[str, str]:
             "voice": req.voice,
             "hook_card": req.hook_card,
             "price_text": req.price_text,
+            "assets": req.assets,
+            "description": req.description,
         },
     )
     return {"job_id": job_id}
+
+
+@app.post("/api/assets")
+async def upload_assets(files: list[UploadFile]) -> list[dict[str, Any]]:
+    hasil: list[dict[str, Any]] = []
+    for f in files:
+        blob = await f.read()
+        try:
+            hasil.append(assets.save(f.filename or "asset", blob).as_dict())
+        except ValueError as exc:
+            raise HTTPException(400, f"{f.filename}: {exc}") from exc
+    return hasil
+
+
+@app.get("/api/assets/{asset_id}/file")
+def asset_file(asset_id: str) -> FileResponse:
+    a = assets.load(asset_id)
+    if not a:
+        raise HTTPException(404, "Aset tidak ditemukan")
+    return FileResponse(a.path)
+
+
+@app.delete("/api/assets/{asset_id}")
+def asset_delete(asset_id: str) -> dict[str, bool]:
+    assets.delete(asset_id)
+    return {"ok": True}
 
 
 @app.get("/api/usage")

@@ -17,6 +17,7 @@ from typing import Callable
 
 import httpx
 
+from .. import assets
 from ..config import ASSETS_DIR, OUTPUT_DIR, TTS_PROVIDER, WORK_DIR
 from ..services import gemini, tts
 from ..sources.product import _HEADERS, extract, parse_price_input, price_vague
@@ -252,6 +253,58 @@ _HOOK_CARD_STYLES = {
 }
 
 
+def _still_of(asset, work: Path) -> Path:
+    """Gambar diam untuk kartu hook. Klip video diambil frame pertamanya."""
+    if asset.kind != "video":
+        return asset.path
+    out = work / "hook-still.jpg"
+    if not out.is_file():
+        run_ffmpeg(["-ss", f"{asset.trim_start:.3f}", "-i", str(asset.path),
+                    "-frames:v", "1", "-q:v", "2", str(out)])
+    return out
+
+
+def _render_clip(asset, duration: float, caption: str, out: Path, work: Path,
+                 idx: int, layout: str = "blur-tengah") -> None:
+    """Satu scene dari klip video yang diunggah pengguna.
+
+    Klip dipotong dari `trim_start` sepanjang durasi narasi. Kalau klipnya lebih
+    pendek, frame terakhir dibekukan sampai narasi selesai (`tpad`) - dipilih
+    karena tidak pernah terlihat aneh, tidak seperti loop pendek atau gerak
+    lambat. Audio bawaan klip selalu dibuang; hanya narasi yang terdengar.
+    """
+    chain, style = _layout_chain(layout)
+    # Klip sudah bergerak sendiri, jadi tidak perlu Ken Burns - cukup rapikan
+    # ke 9:16 lalu bekukan sisanya kalau kurang panjang.
+    chain.append(
+        f"[base]tpad=stop_mode=clone:stop_duration={duration:.3f},"
+        f"fps={FPS},setsar=1,trim=duration={duration:.3f},setpts=PTS-STARTPTS[zm]"
+    )
+
+    last = "[zm]"
+    font = _font()
+    if caption.strip() and font:
+        cap_file = work / f"cap-{idx:02d}.txt"
+        cap_file.write_text(_wrap(caption), encoding="utf-8")
+        chain.append(
+            f"{last}drawtext=fontfile='{_esc(font)}':textfile='{_esc(cap_file)}':"
+            f"fontcolor={style['fontcolor']}:fontsize=52:line_spacing=12:"
+            f"box=1:boxcolor={style['boxcolor']}:boxborderw=24:"
+            f"x=(w-text_w)/2:y={style['y']}[v]"
+        )
+        last = "[v]"
+    else:
+        chain.append(f"{last}null[v]")
+
+    run_ffmpeg([
+        "-ss", f"{asset.trim_start:.3f}", "-t", f"{duration:.3f}", "-i", str(asset.path),
+        "-filter_complex", ";".join(chain),
+        "-map", "[v]", "-an",
+        "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", "20", "-pix_fmt", "yuv420p",
+        str(out),
+    ])
+
+
 def _render_hook_card(image: Path, duration: float, text: str, out: Path, work: Path,
                       layout: str = "blur-tengah") -> None:
     """Kartu pembuka: teks besar di atas latar produk yang dikaburkan.
@@ -300,8 +353,15 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     speech_style = params.get("speech_style") or rnd.choice(list(tts.STYLES))
     rate = rnd.choice(TTS_RATES)
 
+    asset_ids = list(params.get("assets") or [])
+    custom_desc = str(params.get("description") or "").strip()
+
     report(5, "Membaca halaman produk...")
     product = extract(url)
+    if custom_desc:
+        # Deskripsi tulisan pengguna selalu menang atas hasil scraping: itu yang
+        # dia tahu tentang produknya, bukan tebakan dari halaman.
+        product.description = custom_desc
 
     # TikTok Shop tidak pernah mengekspos harga, dan Shopee kadang juga tidak.
     # Harga yang diketik pengguna selalu menang atas hasil ekstraksi.
@@ -315,7 +375,14 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     report(12, f"Produk: {product.title[:50]}")
 
     work = WORK_DIR / job_id
-    images = _download_images(product.images, work / "img", report)
+    if asset_ids:
+        report(20, f"Memakai {len(asset_ids)} aset unggahan...")
+        media = assets.load_many(asset_ids)
+    else:
+        media = [
+            assets.Asset(id=f"img{i}", kind="image", path=p, width=0, height=0, duration=0.0)
+            for i, p in enumerate(_download_images(product.images, work / "img", report))
+        ]
 
     # Jumlah scene mengikuti target durasi, bukan jumlah gambar: satu scene
     # rata-rata beberapa detik setelah dinarasikan (lihat _seconds_per_scene).
@@ -366,11 +433,18 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
 
     def render_one(i: int) -> int:
         if hook_text and i == 0:
-            _render_hook_card(images[0], durations[0] + pads[0],
+            # Kartu hook selalu dari gambar diam; kalau aset pertama berupa klip,
+            # frame pertamanya diambil sebagai latar.
+            _render_hook_card(_still_of(media[0], work), durations[0] + pads[0],
                               hook_text, clips[0], work, layout=layout)
+            return i
+        j = i - offset
+        asset = media[j % len(media)]
+        if asset.kind == "video":
+            _render_clip(asset, durations[i] + pads[i], scenes[j]["caption"],
+                         clips[i], work, j, layout=layout)
         else:
-            j = i - offset
-            _render_scene(images[j % len(images)], durations[i] + pads[i],
+            _render_scene(asset.path, durations[i] + pads[i],
                           scenes[j]["caption"], clips[i], work, j, layout=layout)
         return i
 

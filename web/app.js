@@ -76,6 +76,55 @@ $("jobs").addEventListener("click", async (e) => {
   await fetch(`/api/jobs/${id}`, { method: "DELETE" });
 });
 
+/* ----------------------------------------------------------------- aset */
+
+let ASSETS = [];
+
+function renderAssets() {
+  const el = $("assetList");
+  if (!ASSETS.length) { el.innerHTML = ""; return; }
+  el.innerHTML = ASSETS.map((a) => `<div class="asset">
+    ${a.kind === "video"
+      ? `<video src="/api/assets/${esc(a.id)}/file" muted preload="metadata"></video>`
+      : `<img src="/api/assets/${esc(a.id)}/file" alt="">`}
+    <div class="asset-info">
+      <div class="asset-name">${esc(a.name)}</div>
+      <div class="asset-meta">${a.kind === "video" ? `klip ${a.duration}s` : "gambar"}
+        &middot; ${a.width}x${a.height}</div>
+    </div>
+    <button type="button" class="link-btn" data-asset="${esc(a.id)}">Hapus</button>
+  </div>`).join("");
+}
+
+$("pFiles").addEventListener("change", async (e) => {
+  const files = [...e.target.files];
+  if (!files.length) return;
+  const errEl = document.querySelector('[data-err="product"]');
+  errEl.textContent = "Mengunggah...";
+  const fd = new FormData();
+  files.forEach((f) => fd.append("files", f));
+  try {
+    const res = await fetch("/api/assets", { method: "POST", body: fd });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || "Upload gagal");
+    ASSETS = ASSETS.concat(body);
+    renderAssets();
+    errEl.textContent = "";
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    e.target.value = "";
+  }
+});
+
+$("assetList").addEventListener("click", async (e) => {
+  const id = e.target.dataset?.asset;
+  if (!id) return;
+  await fetch(`/api/assets/${id}`, { method: "DELETE" });
+  ASSETS = ASSETS.filter((a) => a.id !== id);
+  renderAssets();
+});
+
 /* ---------------------------------------------------------------- kuota */
 
 function usageRow(m) {
@@ -153,6 +202,8 @@ $("formProduct").addEventListener("submit", (e) => {
     voice: $("pVoice").value,
     hook_card: $("pHookCard").checked,
     price_text: $("pPrice").value.trim(),
+    assets: ASSETS.map((a) => a.id),
+    description: $("pDesc").value.trim(),
   }, "product");
 });
 

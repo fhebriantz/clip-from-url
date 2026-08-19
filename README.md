@@ -60,6 +60,39 @@ suaranya terdengar hilang-muncul.
 Suara narator memakai `edge-tts` (gratis, tanpa API key): Ardi (pria) atau
 Gadis (wanita).
 
+## Aset dan deskripsi sendiri
+
+Dua kolom opsional di UI:
+
+- **Aset sendiri** - unggah gambar atau klip video. Kalau diisi, gambar tidak lagi
+  diambil dari halaman produk. Aset dipakai berurutan dan diputar ulang kalau
+  scene-nya lebih banyak.
+- **Deskripsi sendiri** - kalau diisi, menggantikan deskripsi hasil scraping.
+  Deskripsimu selalu menang: itu yang kamu tahu soal produknya, bukan tebakan
+  dari halaman.
+
+Perlu diluruskan: fitur ini **tidak mempercepat** pembuatan video. Scraping hanya
+sekitar 2% dari total waktu job (1,0 detik baca halaman + 0,6 detik unduh gambar,
+dari job yang memakan 30-120 detik). Nilainya ada di kendali visual, bukan kecepatan.
+
+### Perlakuan klip video
+
+- Klip dipotong dari detik awal sepanjang narasi scene-nya.
+- Kalau klip lebih pendek dari narasi, **frame terakhir dibekukan** sampai narasi
+  selesai. Dipilih karena tidak pernah terlihat aneh, tidak seperti loop pendek
+  atau gerak lambat.
+- **Audio bawaan klip selalu dibuang** - hanya narasi yang terdengar.
+- Ken Burns tidak diterapkan ke klip; gambarnya sudah bergerak sendiri.
+- Klip landscape akan berpita blur tebal di atas dan bawah. Rekaman vertikal jauh
+  lebih bagus hasilnya.
+
+### Yang belum ada
+
+- **Slider trim** - sekarang selalu dari detik nol. Menyusul di tahap berikutnya.
+- **Pembersihan otomatis** berkas unggahan; sementara dihapus manual lewat UI.
+- Klip berformat HEVC/MOV dari iPhone mungkin tidak bisa dipratinjau di browser,
+  meski tetap bisa diproses FFmpeg.
+
 ## Apa yang bisa diambil per platform
 
 | Data | Tokopedia | Shopee | TikTok Shop |

@@ -47,6 +47,15 @@
           </select>
         </label>
       </div>
+      <label>Aset sendiri <span class="opt">(opsional - gambar atau klip video. Kalau diisi, gambar tidak diambil dari halaman produk)</span>
+        <input id="pFiles" type="file" accept="image/*,video/*" multiple>
+      </label>
+      <div id="assetList" class="assets"></div>
+
+      <label>Deskripsi sendiri <span class="opt">(opsional - kalau diisi, menggantikan deskripsi dari halaman produk)</span>
+        <textarea id="pDesc" rows="3" placeholder="Tulis apa yang kamu tahu soal produknya. Gemini yang akan menyusunnya jadi naskah."></textarea>
+      </label>
+
       <label class="check">
         <input id="pHookCard" type="checkbox" checked>
         <span>Kartu hook di awal (teks besar penahan scroll)</span>
