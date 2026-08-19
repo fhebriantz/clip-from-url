@@ -88,6 +88,22 @@ web/             UI (HTML/CSS/JS, tanpa build step)
 data/            database, berkas kerja, dan hasil
 ```
 
+## Kecepatan
+
+Narasi seluruh scene dibuat berbarengan dalam satu event loop, dan render scene
+dijalankan beberapa proses sekaligus (`RENDER_PARALLEL`, otomatis dari jumlah core).
+
+Terukur di mesin 8 core untuk video 4 scene:
+
+| Tahap | Sebelum | Sesudah |
+|---|---|---|
+| Narasi TTS | ~9,1s (berurutan) | ~2,4s |
+| Render scene | ~18,6s | ~8,7s |
+
+Sisa waktu job hampir seluruhnya menunggu Gemini menulis naskah, yang di luar
+kendali aplikasi dan bisa berayun dari 20 detik sampai lebih dari 100 detik kalau
+model sedang sibuk.
+
 ## Catatan
 
 - Gambar dan berkas sementara dihapus otomatis setelah video jadi. Hasil video

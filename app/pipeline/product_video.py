@@ -6,9 +6,11 @@ durasi tiap scene mengikuti panjang audionya.
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import textwrap
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable
 
@@ -26,6 +28,17 @@ W, H = 1080, 1920
 MIN_IMAGE_PX = 400
 MAX_IMAGES = 6
 MAX_SCENES = 12
+
+# libx264 sudah memakai banyak core untuk satu encode, jadi menjalankan beberapa
+# scene berbarengan hanya menambah sekitar 1,6x - bukan sebanyak jumlah prosesnya.
+# Diukur di mesin 8 core untuk 4 scene: sekuensial 16,4s, paralel 3 10,4s,
+# paralel 6 12,5s. Lebih dari 3 mulai rebutan core dan malah melambat.
+RENDER_PARALLEL = max(1, min(3, (os.cpu_count() or 2) // 2))
+
+# Preset dipertahankan di "medium": preset lebih cepat tidak terbukti lebih
+# kencang di pengukuran, tapi jelas membuang detail (59 KB vs 77 KB per scene
+# pada CRF yang sama).
+VIDEO_PRESET = "medium"
 # Perkiraan dari pengukuran: narasi 8-18 kata plus jeda akhir memakan sekitar
 # 4,6-5,9 detik per scene tergantung suara dan panjang kalimat. Durasi akhir
 # karena itu meleset beberapa detik dari target - ini perkiraan, bukan jaminan.
@@ -141,7 +154,7 @@ def _render_scene(image: Path, duration: float, caption: str, out: Path, work: P
         "-loop", "1", "-framerate", str(FPS), "-t", f"{duration:.3f}", "-i", str(image),
         "-filter_complex", ";".join(chain),
         "-map", "[v]",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+        "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", "20", "-pix_fmt", "yuv420p",
         str(out),
     ])
 
@@ -183,15 +196,24 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
             raise RuntimeError(f"Durasi audio scene {i + 1} tidak terbaca.")
 
     # Kalau scene lebih banyak daripada gambar, gambar diputar ulang.
-    clips: list[Path] = []
-    for i, scene in enumerate(scenes):
-        pct = 52 + int(i / len(scenes) * 33)
-        report(pct, f"Membuat scene {i + 1}/{len(scenes)}...")
-        clip = work / f"scene-{i:02d}.mp4"
+    clips = [work / f"scene-{i:02d}.mp4" for i in range(len(scenes))]
+    workers = min(RENDER_PARALLEL, len(scenes))
+    report(52, f"Membuat {len(scenes)} scene ({workers} paralel)...")
+
+    def render_one(i: int) -> int:
         # Jeda kecil di akhir agar potongan tidak terasa terburu-buru.
         _render_scene(images[i % len(images)], durations[i] + 0.35,
-                      scene["caption"], clip, work, i)
-        clips.append(clip)
+                      scenes[i]["caption"], clips[i], work, i)
+        return i
+
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(render_one, i) for i in range(len(scenes))]
+        for future in as_completed(futures):
+            future.result()  # lempar ulang error dari thread mana pun
+            done += 1
+            report(52 + int(done / len(scenes) * 33),
+                   f"Membuat scene... {done}/{len(scenes)} selesai")
 
     report(88, "Menggabungkan video...")
     listing = work / "concat.txt"
