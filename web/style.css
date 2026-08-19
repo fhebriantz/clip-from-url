@@ -133,3 +133,21 @@ input[type=text] {
 .job-actions { display: flex; gap: 10px; margin-top: 12px; }
 .link-btn { background: none; border: 0; color: var(--muted); font-size: 12px; padding: 0; cursor: pointer; }
 .link-btn:hover { color: var(--err); }
+
+.usage { padding: 16px; }
+.use-row + .use-row { margin-top: 16px; }
+.use-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.use-name { font-size: 13px; font-weight: 600; word-break: break-all; }
+.use-count { font-size: 12px; white-space: nowrap; }
+.use-count.good { color: var(--ok); }
+.use-count.warn { color: #d9a441; }
+.use-count.bad  { color: var(--err); }
+.use-bar { height: 6px; background: var(--surface-2); border-radius: 999px; margin: 7px 0 5px; overflow: hidden; }
+.use-bar > div { height: 100%; border-radius: 999px; transition: width .4s ease; }
+.use-bar > div.good { background: var(--ok); }
+.use-bar > div.warn { background: #d9a441; }
+.use-bar > div.bad  { background: var(--err); }
+.use-meta { font-size: 11px; color: var(--muted); }
+.use-total { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; }
+.use-warn { margin-top: 12px; font-size: 12px; color: var(--err); }
+.use-note { margin: 8px 0 0; font-size: 11px; color: var(--muted); line-height: 1.45; }

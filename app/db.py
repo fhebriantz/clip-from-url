@@ -39,6 +39,19 @@ CREATE TABLE IF NOT EXISTS clips (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_clips_job ON clips(job_id);
+CREATE TABLE IF NOT EXISTS usage (
+    id         TEXT PRIMARY KEY,
+    kind       TEXT NOT NULL,
+    model      TEXT NOT NULL,
+    in_tokens  INTEGER NOT NULL DEFAULT 0,
+    out_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd   REAL NOT NULL DEFAULT 0,
+    ok         INTEGER NOT NULL DEFAULT 1,
+    note       TEXT NOT NULL DEFAULT '',
+    day        TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_usage_day ON usage(day);
 """
 
 
@@ -118,6 +131,58 @@ def add_clip(job_id: str, filename: str, start_s: float, end_s: float,
             (uuid.uuid4().hex[:12], job_id, filename, start_s, end_s, label, reason, score, _now()),
         )
         _db().commit()
+
+
+def add_usage(kind: str, model: str, in_tokens: int, out_tokens: int,
+              cost_usd: float, ok: bool, note: str) -> None:
+    ts = _now()
+    with _lock:
+        _db().execute(
+            "INSERT INTO usage (id, kind, model, in_tokens, out_tokens, cost_usd, ok, note, day, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (uuid.uuid4().hex[:12], kind, model, in_tokens, out_tokens, cost_usd,
+             1 if ok else 0, note, ts[:10], ts),
+        )
+        _db().commit()
+
+
+def usage_by_model(day: str) -> list[dict[str, Any]]:
+    with _lock:
+        rows = _db().execute(
+            "SELECT model, COUNT(*) AS requests, SUM(in_tokens) AS in_tokens, "
+            "SUM(out_tokens) AS out_tokens, SUM(cost_usd) AS cost_usd "
+            "FROM usage WHERE day=? AND ok=1 GROUP BY model ORDER BY requests DESC",
+            (day,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def usage_notes(day: str) -> dict[str, str]:
+    """Catatan terakhir per model, misal penanda thinking yang tidak dibatasi."""
+    with _lock:
+        rows = _db().execute(
+            "SELECT model, note FROM usage WHERE day=? AND ok=1 AND note<>'' "
+            "GROUP BY model HAVING MAX(created_at)", (day,)
+        ).fetchall()
+    return {r["model"]: r["note"] for r in rows}
+
+
+def usage_total_since(days: int) -> float:
+    with _lock:
+        row = _db().execute(
+            "SELECT COALESCE(SUM(cost_usd), 0) AS total FROM usage "
+            "WHERE ok=1 AND day >= date('now', ?)", (f"-{int(days)} days",)
+        ).fetchone()
+    return float(row["total"] or 0)
+
+
+def usage_quota_failures(day: str) -> int:
+    with _lock:
+        row = _db().execute(
+            "SELECT COUNT(*) AS n FROM usage WHERE day=? AND ok=0 AND note LIKE '%429%'",
+            (day,),
+        ).fetchone()
+    return int(row["n"] or 0)
 
 
 def list_jobs(limit: int = 50) -> list[dict[str, Any]]:

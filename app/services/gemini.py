@@ -9,6 +9,7 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
+from .. import usage
 from ..config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_THINKING
 
 
@@ -30,6 +31,22 @@ def _client() -> genai.Client:
 _RETRY_CODES = {429, 500, 502, 503, 504}
 _ATTEMPTS_PER_MODEL = 3
 _FALLBACKS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview"]
+
+
+def _record(model: str, resp, note: str = "") -> None:
+    """Catat token yang terpakai. Thinking ditagih sebagai token keluaran."""
+    u = getattr(resp, "usage_metadata", None)
+    if not u:
+        return
+    think = getattr(u, "thoughts_token_count", None) or 0
+    if think and not note:
+        # Tanpa penanda ini, lonjakan biaya karena thinking tidak terlihat
+        # di ringkasan pemakaian.
+        note = f"thinking {think} token"
+    usage.record("naskah", model,
+                 u.prompt_token_count or 0,
+                 (u.candidates_token_count or 0) + think,
+                 note=note)
 
 
 def _model_chain() -> list[str]:
@@ -152,6 +169,7 @@ def write_product_script(product: dict, scenes: int, duration: int,
                 resp = client.models.generate_content(
                     model=model, contents=prompt, config=_script_config()
                 )
+                _record(model, resp)
                 return _clean_script(resp.parsed or {}, scenes, vague,
                                      product.get("price"))
             except (genai_errors.ServerError, genai_errors.ClientError) as exc:
@@ -164,7 +182,12 @@ def write_product_script(product: dict, scenes: int, duration: int,
                     resp = client.models.generate_content(
                         model=model, contents=prompt,
                         config=_script_config(with_thinking=False))
+                    _record(model, resp, note="thinking dimatikan (model menolak setelan)")
+                    print(f"[gemini] {model} menolak setelan thinking; "
+                          "diulang tanpa batasan - biaya naskah bisa naik beberapa kali lipat",
+                          flush=True)
                     return _clean_script(resp.parsed or {}, scenes, vague, product.get("price"))
+                usage.record("naskah", model, 0, 0, ok=False, note=str(exc))
                 if code not in _RETRY_CODES or attempt == _ATTEMPTS_PER_MODEL:
                     break
                 if on_status:

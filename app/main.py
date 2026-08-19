@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from . import db, worker
+from . import db, usage, worker
 from .services import tts
 from .sources.product import UnsupportedURL, detect_source
 from .config import (
@@ -91,6 +91,11 @@ def create_product(req: ProductRequest) -> dict[str, str]:
         },
     )
     return {"job_id": job_id}
+
+
+@app.get("/api/usage")
+def get_usage() -> dict[str, Any]:
+    return usage.summary()
 
 
 @app.get("/api/jobs")

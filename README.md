@@ -129,6 +129,23 @@ Default `gemini-3.6-flash`. Model flash terbaru sering menolak dengan `503` saat
 permintaan menumpuk, jadi ada dua lapis penanganan: retry dengan backoff, lalu
 pindah ke model cadangan (`gemini-3.5-flash`, `gemini-3-flash-preview`).
 
+## Panel pemakaian API
+
+UI menampilkan berapa request yang sudah dipakai hari ini per model, sisa jatah
+tier gratis, jumlah token, dan biayanya.
+
+Angka ini **dihitung sendiri dari panggilan aplikasi ini**, karena Gemini tidak
+menyediakan cara menanyakan sisa kuota sebenarnya. Konsekuensinya:
+
+- Pemakaian dari aplikasi lain dengan API key yang sama tidak ikut terhitung.
+- Batas 20 request per hari per model diambil dari pesan galat, bukan dokumentasi
+  resmi, jadi perlakukan sebagai perkiraan.
+- Hitungan harian memakai tanggal UTC, yang belum tentu sama dengan jendela reset
+  milik Google.
+
+Bar berubah kuning di 75% dan merah saat jatah habis. Kalau ada request yang
+ditolak karena kuota, jumlahnya ikut ditampilkan.
+
 ## Struktur
 
 ```
@@ -202,6 +219,14 @@ Efek sampingnya sempat terlihat: naskah versi `low` menulis hook yang diulang la
 persis di scene pertama, sehingga penonton mendengar kalimat yang sama dua kali
 (kartu hook membacakan hook, lalu scene 1 mengulangnya). Diatasi dengan aturan
 eksplisit di prompt, bukan dengan mengembalikan thinking.
+
+### Pilihan model penting
+
+`gemini-3.6-flash` (bawaan) menuruti setelan thinking `low` dengan konsisten.
+`gemini-3.5-flash` **tidak** - terpantau tetap memakai ~1.500 token thinking meski
+disetel `low`, dan tarifnya juga dua kali lipat. Gabungan keduanya membuat biaya
+naskah naik sekitar 10x. Panel pemakaian di UI menandai kondisi ini dengan label
+`thinking N token`.
 
 ### Batas tier gratis
 

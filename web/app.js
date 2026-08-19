@@ -67,6 +67,7 @@ function renderJobs(jobs) {
   if (el.dataset.sig === sig) return;
   el.dataset.sig = sig;
   el.innerHTML = jobs.map(renderJob).join("");
+  refreshUsage();
 }
 
 $("jobs").addEventListener("click", async (e) => {
@@ -74,6 +75,47 @@ $("jobs").addEventListener("click", async (e) => {
   if (!id || !confirm("Hapus job ini beserta seluruh berkasnya?")) return;
   await fetch(`/api/jobs/${id}`, { method: "DELETE" });
 });
+
+/* ---------------------------------------------------------------- kuota */
+
+function usageRow(m) {
+  const pakai = Math.min(m.requests, m.limit);
+  const pct = Math.min(100, (m.requests / m.limit) * 100);
+  const level = m.habis ? "bad" : pct >= 75 ? "warn" : "good";
+  return `<div class="use-row">
+    <div class="use-head">
+      <span class="use-name">${esc(m.model)}</span>
+      <span class="use-count ${level}">${m.requests} / ${m.limit} request</span>
+    </div>
+    <div class="use-bar"><div class="${level}" style="width:${pct}%"></div></div>
+    ${m.catatan ? `<div class="use-warn">${esc(m.catatan)}</div>` : ""}
+    <div class="use-meta">${m.habis
+      ? "Kuota gratis habis - narasi akan pakai suara cadangan"
+      : `sisa sekitar ${m.sisa} request`}
+      &middot; ${(m.in_tokens + m.out_tokens).toLocaleString("id-ID")} token
+      &middot; $${m.cost_usd.toFixed(4)}</div>
+  </div>`;
+}
+
+async function refreshUsage() {
+  try {
+    const u = await (await fetch("/api/usage")).json();
+    const el = $("usage");
+    if (!u.models.length) {
+      el.innerHTML = `<p class="empty">Belum ada pemakaian hari ini.</p>
+        <p class="use-note">${esc(u.catatan)}</p>`;
+      return;
+    }
+    const gagal = u.gagal_kuota_hari_ini
+      ? `<div class="use-warn">${u.gagal_kuota_hari_ini}x ditolak karena kuota hari ini</div>` : "";
+    el.innerHTML = u.models.map(usageRow).join("") + gagal +
+      `<div class="use-total">Hari ini $${u.biaya_hari_ini.toFixed(4)}
+        &middot; 30 hari terakhir $${u.biaya_30_hari.toFixed(3)}</div>
+       <p class="use-note">${esc(u.catatan)}</p>`;
+  } catch {
+    $("usage").innerHTML = '<p class="empty">Gagal memuat pemakaian.</p>';
+  }
+}
 
 /* --------------------------------------------------------------- submit */
 
@@ -118,3 +160,5 @@ const stream = new EventSource("/api/events");
 stream.onmessage = (e) => renderJobs(JSON.parse(e.data));
 
 checkHealth();
+refreshUsage();
+setInterval(refreshUsage, 60000);

@@ -20,6 +20,7 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
+from .. import usage
 from ..config import GEMINI_API_KEY, GEMINI_TTS_MODEL, TTS_PROVIDER
 from ..tools import ensure_ffmpeg, ffprobe_duration
 
@@ -175,6 +176,10 @@ def _gemini_one(client: genai.Client, text: str, voice_name: str, style: str,
                                 voice_name=voice_name))),
                 ),
             )
+            u = getattr(resp, "usage_metadata", None)
+            if u:
+                usage.record("suara", GEMINI_TTS_MODEL,
+                             u.prompt_token_count or 0, u.candidates_token_count or 0)
             pcm = resp.candidates[0].content.parts[0].inline_data.data
             if not pcm:
                 raise RuntimeError("Gemini TTS tidak mengembalikan audio.")
@@ -184,6 +189,7 @@ def _gemini_one(client: genai.Client, text: str, voice_name: str, style: str,
             return out
         except (genai_errors.ServerError, genai_errors.ClientError) as exc:
             last = exc
+            usage.record("suara", GEMINI_TTS_MODEL, 0, 0, ok=False, note=str(exc))
             if getattr(exc, "code", None) not in _RETRY_CODES or attempt == _ATTEMPTS:
                 break
             time.sleep(delay)
