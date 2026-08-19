@@ -11,6 +11,7 @@ import random
 import re
 import subprocess
 import textwrap
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable
@@ -36,6 +37,11 @@ MAX_SCENES = 12
 # Diukur di mesin 8 core untuk 4 scene: sekuensial 16,4s, paralel 3 10,4s,
 # paralel 6 12,5s. Lebih dari 3 mulai rebutan core dan malah melambat.
 RENDER_PARALLEL = max(1, min(3, (os.cpu_count() or 2) // 2))
+
+# Jatah encode dibagi lintas SELURUH job, bukan per job. Kalau tiap job memakai
+# RENDER_PARALLEL proses sendiri, dua job berbarengan langsung menggandakan beban
+# dan malah saling memperlambat - encode sudah memakai banyak core sendiri.
+_RENDER_SLOTS = threading.Semaphore(RENDER_PARALLEL)
 
 # Preset dipertahankan di "medium": preset lebih cepat tidak terbukti lebih
 # kencang di pengukuran, tapi jelas membuang detail (59 KB vs 77 KB per scene
@@ -471,13 +477,17 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     clips += [work / f"scene-{i:02d}.mp4" for i in range(len(scenes))]
 
     workers = min(RENDER_PARALLEL, len(clips))
-    report(52, f"Membuat {len(clips)} bagian ({workers} paralel, {layout})...")
+    report(52, f"Membuat {len(clips)} bagian ({layout})...")
 
     # Jeda per bagian; dipakai bersama oleh video dan audio agar tetap sinkron.
     pads = [HOOK_CARD_PAD if (hook_text and i == 0) else SCENE_GAP
             for i in range(len(clips))]
 
     def render_one(i: int) -> int:
+        with _RENDER_SLOTS:
+            return _render_one(i)
+
+    def _render_one(i: int) -> int:
         if hook_text and i == 0:
             # Kartu hook selalu dari gambar diam; kalau aset pertama berupa klip,
             # frame pertamanya diambil sebagai latar.

@@ -7,11 +7,12 @@ import time
 import traceback
 
 from . import assets, db
-from .config import ASSET_KEEP_DAYS, ASSET_ORPHAN_HOURS
+from .config import ASSET_KEEP_DAYS, ASSET_ORPHAN_HOURS, JOB_WORKERS
 from .pipeline import product_video
 
 _stop = threading.Event()
-_thread: threading.Thread | None = None
+_threads: list[threading.Thread] = []
+_cleanup_lock = threading.Lock()
 
 # Pembersihan aset dijalankan dari loop worker, bukan thread terpisah: loop ini
 # sudah berdetak tiap detik dan tidak pernah sibuk saat antrian kosong.
@@ -21,10 +22,11 @@ _last_cleanup = 0.0
 
 def run_cleanup(force: bool = False) -> dict | None:
     global _last_cleanup
-    now = time.monotonic()
-    if not force and now - _last_cleanup < CLEANUP_EVERY:
-        return None
-    _last_cleanup = now
+    with _cleanup_lock:
+        now = time.monotonic()
+        if not force and now - _last_cleanup < CLEANUP_EVERY:
+            return None
+        _last_cleanup = now
     try:
         hasil = assets.cleanup(db.asset_refs())
     except Exception as exc:  # noqa: BLE001 - pembersihan gagal tidak boleh mematikan worker
@@ -100,31 +102,38 @@ def _process(job: dict) -> _PhaseTimer:
     return timer
 
 
-def _loop() -> None:
+def _loop(nomor: int) -> None:
     while not _stop.is_set():
+        # claim_next_job() atomik, jadi dua worker tidak akan mengambil job sama.
         job = db.claim_next_job()
         if job is None:
             run_cleanup()
             _stop.wait(1.0)
             continue
-        print(f"[worker] mulai job {job['id']} ({job['kind']})", flush=True)
+        jid = job["id"]
+        print(f"[worker{nomor}] mulai job {jid} ({job['kind']})", flush=True)
         started = time.monotonic()
         timer = _process(job)
         total = time.monotonic() - started
-        print(f"[worker] selesai job {job['id']} dalam {total:.1f}s", flush=True)
+        # Keluaran beberapa worker saling menyela, jadi tiap baris diberi id job.
+        baris = [f"[worker{nomor}] selesai job {jid} dalam {total:.1f}s"]
         for label, secs in timer.summary():
             share = secs / total * 100 if total else 0
-            print(f"[waktu]   {secs:6.1f}s  {share:4.1f}%  {label}", flush=True)
+            baris.append(f"[waktu {jid}] {secs:6.1f}s  {share:4.1f}%  {label}")
+        print("\n".join(baris), flush=True)
 
 
 def start() -> None:
-    global _thread
-    if _thread and _thread.is_alive():
+    if any(t.is_alive() for t in _threads):
         return
     _stop.clear()
     run_cleanup(force=True)
-    _thread = threading.Thread(target=_loop, name="worker", daemon=True)
-    _thread.start()
+    _threads.clear()
+    for i in range(1, JOB_WORKERS + 1):
+        t = threading.Thread(target=_loop, args=(i,), name=f"worker{i}", daemon=True)
+        t.start()
+        _threads.append(t)
+    print(f"[worker] {JOB_WORKERS} worker siap", flush=True)
 
 
 def stop() -> None:

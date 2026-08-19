@@ -394,6 +394,31 @@ dari dalam aplikasi. Kalau musik dibakar ke dalam berkas, keuntungan itu hilang.
 Video keluar dengan narasi saja supaya kamu bisa menambahkan sound trending saat
 upload.
 
+## Beberapa job sekaligus
+
+Sekitar 60-80% waktu job hanya menunggu API Gemini, jadi worker bisa mengerjakan
+beberapa job berbarengan. Jumlahnya diatur lewat `JOB_WORKERS` di `.env`
+(default 2).
+
+Jatah proses encode dibatasi **bersama lintas seluruh job**, bukan per job. Kalau
+tidak, dua job berbarengan langsung menggandakan jumlah proses FFmpeg dan malah
+saling memperlambat - encode sudah memakai banyak core sendiri.
+
+Terukur untuk 3 video berturut-turut:
+
+| | Total | Per video |
+|---|---|---|
+| 1 worker | 59,1 detik | 19,7 detik |
+| 3 worker | 48,1 detik | 16,0 detik |
+
+Kenaikannya **sekitar 1,2x**, jauh di bawah 3x yang diharapkan dari jumlah worker.
+Job masing-masing justru jadi lebih lama (20,9 / 38,9 / 48,1 detik dibanding 16-21
+detik saat sendirian), yang mengarah ke pembatasan di sisi Google untuk satu API
+key - tapi ini **belum terbukti**, pengujiannya terhenti karena kuota habis.
+
+Untuk satu job tunggal tidak ada perubahan apa pun; manfaatnya hanya terasa saat
+mengantre beberapa produk sekaligus.
+
 ## Kecepatan
 
 Narasi seluruh scene dibuat berbarengan dalam satu event loop, dan render scene

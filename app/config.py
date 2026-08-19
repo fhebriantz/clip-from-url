@@ -37,6 +37,11 @@ GEMINI_THINKING = os.getenv("GEMINI_THINKING", "low").strip().lower()
 # unggahan telantar dan dibuang lebih cepat daripada yang sudah terpakai.
 ASSET_ORPHAN_HOURS = int(os.getenv("ASSET_ORPHAN_HOURS", "24"))
 ASSET_KEEP_DAYS = int(os.getenv("ASSET_KEEP_DAYS", "7"))
+
+# Berapa job diproses berbarengan. Sekitar 60-80% waktu job hanya menunggu API
+# Gemini, jadi menjalankan beberapa sekaligus menaikkan throughput tanpa menambah
+# beban CPU - jatah encode tetap dibatasi bersama lewat RENDER_PARALLEL.
+JOB_WORKERS = max(1, int(os.getenv("JOB_WORKERS", "2")))
 # "gemini" jauh lebih hidup dan bisa diatur gayanya; "edge" gratis tanpa kuota API.
 TTS_PROVIDER = os.getenv("TTS_PROVIDER", "gemini").strip().lower()
 PORT = int(os.getenv("PORT", "8765"))
