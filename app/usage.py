@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from . import db
+from . import assets, db
 
 # USD per 1 juta token, dari halaman harga resmi (dicek Agustus 2026).
 PRICING: dict[str, tuple[float, float]] = {
@@ -77,6 +77,7 @@ def summary() -> dict[str, Any]:
         "biaya_hari_ini": sum(m["cost_usd"] for m in models),
         "biaya_30_hari": db.usage_total_since(30),
         "gagal_kuota_hari_ini": db.usage_quota_failures(_today()),
+        "aset": assets.storage(),
         "catatan": "Dihitung dari pemakaian aplikasi ini saja; Gemini tidak "
                    "menyediakan cara menanyakan sisa kuota sebenarnya.",
     }

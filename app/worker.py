@@ -6,11 +6,37 @@ import threading
 import time
 import traceback
 
-from . import db
+from . import assets, db
+from .config import ASSET_KEEP_DAYS, ASSET_ORPHAN_HOURS
 from .pipeline import product_video
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
+
+# Pembersihan aset dijalankan dari loop worker, bukan thread terpisah: loop ini
+# sudah berdetak tiap detik dan tidak pernah sibuk saat antrian kosong.
+CLEANUP_EVERY = 6 * 3600
+_last_cleanup = 0.0
+
+
+def run_cleanup(force: bool = False) -> dict | None:
+    global _last_cleanup
+    now = time.monotonic()
+    if not force and now - _last_cleanup < CLEANUP_EVERY:
+        return None
+    _last_cleanup = now
+    try:
+        hasil = assets.cleanup(db.asset_refs())
+    except Exception as exc:  # noqa: BLE001 - pembersihan gagal tidak boleh mematikan worker
+        print(f"[bersih] gagal: {exc}", flush=True)
+        return None
+    if hasil["dihapus"] or hasil["frame_dirapikan"]:
+        mb = hasil["bytes"] / 1024 / 1024
+        print(f"[bersih] {len(hasil['dihapus'])} aset dihapus ({mb:.1f} MB), "
+              f"{hasil['frame_dirapikan']} frame cache dirapikan "
+              f"(telantar >{ASSET_ORPHAN_HOURS} jam, terpakai >{ASSET_KEEP_DAYS} hari)",
+              flush=True)
+    return hasil
 
 
 class _PhaseTimer:
@@ -78,6 +104,7 @@ def _loop() -> None:
     while not _stop.is_set():
         job = db.claim_next_job()
         if job is None:
+            run_cleanup()
             _stop.wait(1.0)
             continue
         print(f"[worker] mulai job {job['id']} ({job['kind']})", flush=True)
@@ -95,6 +122,7 @@ def start() -> None:
     if _thread and _thread.is_alive():
         return
     _stop.clear()
+    run_cleanup(force=True)
     _thread = threading.Thread(target=_loop, name="worker", daemon=True)
     _thread.start()
 

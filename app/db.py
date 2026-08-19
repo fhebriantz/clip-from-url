@@ -157,6 +157,25 @@ def usage_by_model(day: str) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def asset_refs() -> dict[str, str]:
+    """Peta id aset -> waktu job TERBARU yang memakainya."""
+    with _lock:
+        rows = _db().execute("SELECT params, created_at FROM jobs").fetchall()
+    terbaru: dict[str, str] = {}
+    for row in rows:
+        try:
+            params = json.loads(row["params"])
+        except (TypeError, ValueError):
+            continue
+        for ref in params.get("assets") or []:
+            asset_id = ref.get("id") if isinstance(ref, dict) else str(ref)
+            if not asset_id:
+                continue
+            if asset_id not in terbaru or row["created_at"] > terbaru[asset_id]:
+                terbaru[asset_id] = row["created_at"]
+    return terbaru
+
+
 def usage_notes(day: str) -> dict[str, str]:
     """Catatan terakhir per model, misal penanda thinking yang tidak dibatasi."""
     with _lock:

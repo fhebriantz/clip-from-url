@@ -162,6 +162,16 @@ def asset_delete(asset_id: str) -> dict[str, bool]:
     return {"ok": True}
 
 
+@app.post("/api/assets/cleanup")
+def assets_cleanup() -> dict[str, Any]:
+    hasil = worker.run_cleanup(force=True) or {"dihapus": [], "bytes": 0, "frame_dirapikan": 0}
+    return {
+        "dihapus": len(hasil["dihapus"]),
+        "mb": round(hasil["bytes"] / 1024 / 1024, 2),
+        "frame_dirapikan": hasil["frame_dirapikan"],
+    }
+
+
 @app.get("/api/usage")
 def get_usage() -> dict[str, Any]:
     return usage.summary()

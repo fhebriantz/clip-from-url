@@ -223,13 +223,21 @@ function usageRow(m) {
   </div>`;
 }
 
+function asetRow(a) {
+  if (!a) return "";
+  return `<div class="use-total">Aset unggahan: ${a.jumlah} berkas, ${a.mb} MB
+    <button type="button" id="btnBersih" class="link-btn">Bersihkan sekarang</button></div>`;
+}
+
 async function refreshUsage() {
   try {
     const u = await (await fetch("/api/usage")).json();
     const el = $("usage");
     if (!u.models.length) {
       el.innerHTML = `<p class="empty">Belum ada pemakaian hari ini.</p>
-        <p class="use-note">${esc(u.catatan)}</p>`;
+        ${asetRow(u.aset)}
+        ${asetRow(u.aset)}
+       <p class="use-note">${esc(u.catatan)}</p>`;
       return;
     }
     const gagal = u.gagal_kuota_hari_ini
@@ -237,6 +245,7 @@ async function refreshUsage() {
     el.innerHTML = u.models.map(usageRow).join("") + gagal +
       `<div class="use-total">Hari ini $${u.biaya_hari_ini.toFixed(4)}
         &middot; 30 hari terakhir $${u.biaya_30_hari.toFixed(3)}</div>
+       ${asetRow(u.aset)}
        <p class="use-note">${esc(u.catatan)}</p>`;
   } catch {
     $("usage").innerHTML = '<p class="empty">Gagal memuat pemakaian.</p>';
@@ -290,3 +299,12 @@ stream.onmessage = (e) => renderJobs(JSON.parse(e.data));
 checkHealth();
 refreshUsage();
 setInterval(refreshUsage, 60000);
+
+$("usage").addEventListener("click", async (e) => {
+  if (e.target.id !== "btnBersih") return;
+  e.target.disabled = true;
+  e.target.textContent = "Membersihkan...";
+  const r = await (await fetch("/api/assets/cleanup", { method: "POST" })).json();
+  alert(`${r.dihapus} aset dihapus, ${r.mb} MB dibebaskan, ${r.frame_dirapikan} frame cache dirapikan.`);
+  refreshUsage();
+});

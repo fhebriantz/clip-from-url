@@ -11,9 +11,10 @@ import shutil
 import subprocess
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .config import DATA_DIR
+from .config import ASSET_KEEP_DAYS, ASSET_ORPHAN_HOURS, DATA_DIR
 from .tools import ensure_ffmpeg, run_ffmpeg
 
 UPLOAD_DIR = DATA_DIR / "uploads"
@@ -191,3 +192,78 @@ def load_many(refs: list[dict]) -> list[Asset]:
 
 def delete(asset_id: str) -> None:
     shutil.rmtree(UPLOAD_DIR / asset_id, ignore_errors=True)
+
+
+# Batas jumlah frame pratinjau yang disimpan per aset. Menggeser slider ke banyak
+# posisi bisa menghasilkan ratusan berkas kecil; yang paling lama diakses dibuang.
+MAX_FRAME_CACHE = 120
+
+
+def trim_frame_cache(asset_id: str) -> int:
+    """Buang frame pratinjau berlebih. Kembalikan jumlah berkas yang dihapus."""
+    folder = UPLOAD_DIR / asset_id
+    frames = sorted(folder.glob("frame-*.jpg"), key=lambda f: f.stat().st_atime)
+    lebih = frames[:-MAX_FRAME_CACHE] if len(frames) > MAX_FRAME_CACHE else []
+    for f in lebih:
+        f.unlink(missing_ok=True)
+    return len(lebih)
+
+
+def _folder_bytes(folder: Path) -> int:
+    return sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
+
+
+def storage() -> dict:
+    """Ringkasan pemakaian disk oleh aset unggahan."""
+    if not UPLOAD_DIR.is_dir():
+        return {"jumlah": 0, "mb": 0.0}
+    folders = [f for f in UPLOAD_DIR.iterdir() if f.is_dir()]
+    return {"jumlah": len(folders),
+            "mb": round(sum(_folder_bytes(f) for f in folders) / 1024 / 1024, 1)}
+
+
+def cleanup(refs: dict[str, str], now: datetime | None = None) -> dict:
+    """Hapus aset yang sudah tidak diperlukan.
+
+    Dua aturan berbeda, karena dua situasinya berbeda:
+
+    - Aset yang TIDAK PERNAH dipakai job adalah unggahan telantar - orang
+      mengunggah lalu batal. Dibuang setelah ASSET_ORPHAN_HOURS.
+    - Aset yang sudah dipakai masih berguna untuk membuat ulang video, jadi baru
+      dibuang ASSET_KEEP_DAYS setelah job terakhir yang memakainya.
+
+    `refs` berisi peta id aset -> waktu job terbaru yang memakainya.
+    """
+    now = now or datetime.now(timezone.utc)
+    batas_telantar = now - timedelta(hours=ASSET_ORPHAN_HOURS)
+    batas_terpakai = now - timedelta(days=ASSET_KEEP_DAYS)
+
+    dihapus, dibebaskan, dirapikan = [], 0, 0
+    if not UPLOAD_DIR.is_dir():
+        return {"dihapus": [], "bytes": 0, "frame_dirapikan": 0}
+
+    for folder in UPLOAD_DIR.iterdir():
+        if not folder.is_dir():
+            continue
+        asset_id = folder.name
+        dipakai = refs.get(asset_id)
+        if dipakai:
+            try:
+                terakhir = datetime.fromisoformat(dipakai)
+            except ValueError:
+                terakhir = now
+            if terakhir.tzinfo is None:
+                terakhir = terakhir.replace(tzinfo=timezone.utc)
+            buang = terakhir < batas_terpakai
+        else:
+            dibuat = datetime.fromtimestamp(folder.stat().st_mtime, timezone.utc)
+            buang = dibuat < batas_telantar
+
+        if buang:
+            dibebaskan += _folder_bytes(folder)
+            shutil.rmtree(folder, ignore_errors=True)
+            dihapus.append(asset_id)
+        else:
+            dirapikan += trim_frame_cache(asset_id)
+
+    return {"dihapus": dihapus, "bytes": dibebaskan, "frame_dirapikan": dirapikan}

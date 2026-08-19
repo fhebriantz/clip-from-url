@@ -103,10 +103,32 @@ dan dipakai sebagai sumber pengambilan frame, supaya seek-nya cepat.
 - Klip landscape akan berpita blur tebal di atas dan bawah. Rekaman vertikal jauh
   lebih bagus hasilnya.
 
+### Pembersihan otomatis
+
+Aset unggahan dibersihkan sendiri, dengan dua aturan berbeda karena situasinya
+memang berbeda:
+
+| Kondisi aset | Dibuang setelah |
+|---|---|
+| Tidak pernah dipakai job (unggahan telantar) | 24 jam |
+| Sudah dipakai, dihitung dari job terakhir yang memakainya | 7 hari |
+
+Aset yang sudah dipakai disimpan lebih lama karena masih berguna untuk membuat
+ulang videonya. Batasnya bisa diatur lewat `ASSET_ORPHAN_HOURS` dan
+`ASSET_KEEP_DAYS` di `.env`.
+
+Frame pratinjau juga dibatasi 120 berkas per aset; yang paling lama tidak diakses
+dibuang lebih dulu. Tanpa batas ini, menggeser slider pada klip panjang bisa
+meninggalkan ratusan berkas kecil.
+
+Pembersihan berjalan saat aplikasi dimulai lalu tiap 6 jam, dijalankan dari loop
+worker yang memang sudah berdetak dan menganggur saat antrian kosong. Panel
+pemakaian di UI menampilkan total berkas dan ukurannya, lengkap dengan tombol
+**Bersihkan sekarang**.
+
 ### Yang belum ada
 
 - **Slider trim** - sekarang selalu dari detik nol. Menyusul di tahap berikutnya.
-- **Pembersihan otomatis** berkas unggahan; sementara dihapus manual lewat UI.
 - Klip berformat HEVC/MOV dari iPhone mungkin tidak bisa dipratinjau di browser,
   meski tetap bisa diproses FFmpeg.
 

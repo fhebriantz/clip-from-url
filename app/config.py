@@ -26,6 +26,11 @@ GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
 # Menulis 4 kalimat promosi tidak butuh penalaran panjang. Dengan "low", token
 # thinking turun dari ~1.500 ke 0 dan biaya naskah hemat sekitar 76%.
 GEMINI_THINKING = os.getenv("GEMINI_THINKING", "low").strip().lower()
+
+# Pembersihan aset unggahan. Aset yang tidak pernah dipakai job dianggap
+# unggahan telantar dan dibuang lebih cepat daripada yang sudah terpakai.
+ASSET_ORPHAN_HOURS = int(os.getenv("ASSET_ORPHAN_HOURS", "24"))
+ASSET_KEEP_DAYS = int(os.getenv("ASSET_KEEP_DAYS", "7"))
 # "gemini" jauh lebih hidup dan bisa diatur gayanya; "edge" gratis tanpa kuota API.
 TTS_PROVIDER = os.getenv("TTS_PROVIDER", "gemini").strip().lower()
 PORT = int(os.getenv("PORT", "8765"))
