@@ -168,23 +168,29 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     )
     scenes = script["scenes"]
 
-    # Kalau Gemini mengembalikan scene lebih sedikit, gambar diputar ulang.
-    clips: list[Path] = []
-    audios: list[Path] = []
-    for i, scene in enumerate(scenes):
-        pct = 45 + int(i / len(scenes) * 40)
-        report(pct, f"Membuat scene {i + 1}/{len(scenes)}...")
+    # Semua narasi dibuat sekaligus dalam satu event loop. Tiap kalimat tetap
+    # jadi berkas sendiri supaya durasinya bisa diukur persis, tapi koneksinya
+    # jalan berbarengan - jauh lebih cepat daripada satu per satu.
+    report(45, f"Membuat narasi suara ({len(scenes)} scene)...")
+    audios = tts.synth_many(
+        [(scene["narration"], work / f"voice-{i:02d}.mp3") for i, scene in enumerate(scenes)],
+        voice=voice,
+    )
 
-        audio = work / f"voice-{i:02d}.mp3"
-        tts.synth(scene["narration"], audio, voice=voice)
-        dur = ffprobe_duration(audio)
+    durations = [ffprobe_duration(a) for a in audios]
+    for i, dur in enumerate(durations):
         if dur <= 0:
             raise RuntimeError(f"Durasi audio scene {i + 1} tidak terbaca.")
-        audios.append(audio)
 
+    # Kalau scene lebih banyak daripada gambar, gambar diputar ulang.
+    clips: list[Path] = []
+    for i, scene in enumerate(scenes):
+        pct = 52 + int(i / len(scenes) * 33)
+        report(pct, f"Membuat scene {i + 1}/{len(scenes)}...")
         clip = work / f"scene-{i:02d}.mp4"
         # Jeda kecil di akhir agar potongan tidak terasa terburu-buru.
-        _render_scene(images[i % len(images)], dur + 0.35, scene["caption"], clip, work, i)
+        _render_scene(images[i % len(images)], durations[i] + 0.35,
+                      scene["caption"], clip, work, i)
         clips.append(clip)
 
     report(88, "Menggabungkan video...")
