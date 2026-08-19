@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import DATA_DIR
-from .tools import ensure_ffmpeg
+from .tools import ensure_ffmpeg, run_ffmpeg
 
 UPLOAD_DIR = DATA_DIR / "uploads"
 
@@ -33,6 +33,13 @@ class Asset:
     height: int
     duration: float    # 0 untuk gambar
     trim_start: float = 0.0
+    trim_end: float = 0.0   # 0 berarti sampai akhir klip
+
+    @property
+    def usable(self) -> float:
+        """Panjang klip yang boleh dipakai setelah trim."""
+        end = self.trim_end if self.trim_end > 0 else self.duration
+        return max(0.0, min(end, self.duration) - self.trim_start)
 
     def as_dict(self) -> dict:
         return {
@@ -75,6 +82,50 @@ def probe(path: Path) -> tuple[str, int, int, float]:
     return kind, w, h, duration
 
 
+def preview_path(asset_id: str) -> Path:
+    return UPLOAD_DIR / asset_id / "preview.mp4"
+
+
+def make_preview(asset: Asset) -> None:
+    """Buat salinan 480p yang pasti bisa diputar browser.
+
+    Rekaman ponsel sering memakai HEVC atau MOV yang tidak didukung Chrome, jadi
+    pratinjau untuk slider trim tidak bisa mengandalkan berkas aslinya. Terukur
+    sekitar 1 detik untuk klip 10 detik - murah dibanding manfaatnya.
+    """
+    if asset.kind != "video":
+        return
+    out = preview_path(asset.id)
+    if out.is_file():
+        return
+    run_ffmpeg([
+        "-i", str(asset.path), "-vf", "scale=-2:480",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+        "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(out),
+    ])
+
+
+def frame_at(asset: Asset, t: float) -> Path:
+    """Ambil satu frame pada detik `t`, dipakai untuk pratinjau slider trim.
+
+    Lebih andal daripada mengandalkan pemutaran video di browser: rekaman HEVC
+    atau MOV sering tidak bisa diputar Chrome, sedangkan gambar selalu bisa.
+    Terukur 57-96 ms per frame, dan hasilnya di-cache supaya menggeser slider
+    bolak-balik tidak memanggil FFmpeg berulang.
+    """
+    t = max(0.0, min(t, max(0.0, asset.duration - 0.05)))
+    key = int(round(t * 10)) * 100  # dibulatkan ke 0,1 detik
+    out = asset.path.parent / f"frame-{key:07d}.jpg"
+    if out.is_file():
+        return out
+    src = preview_path(asset.id)
+    run_ffmpeg([
+        "-ss", f"{t:.3f}", "-i", str(src if src.is_file() else asset.path),
+        "-frames:v", "1", "-q:v", "5", "-vf", "scale=-2:360", str(out),
+    ])
+    return out
+
+
 def save(filename: str, blob: bytes) -> Asset:
     if len(blob) > MAX_BYTES:
         raise ValueError(f"Berkas lebih dari {MAX_BYTES // 1024 // 1024} MB.")
@@ -89,14 +140,21 @@ def save(filename: str, blob: bytes) -> Asset:
     except ValueError:
         shutil.rmtree(folder, ignore_errors=True)
         raise
-    return Asset(id=asset_id, kind=kind, path=path, width=w, height=h, duration=duration)
+    asset = Asset(id=asset_id, kind=kind, path=path, width=w, height=h, duration=duration)
+    try:
+        make_preview(asset)
+    except Exception:  # noqa: BLE001 - pratinjau gagal tidak boleh menggagalkan upload
+        pass
+    return asset
 
 
 def load(asset_id: str) -> Asset | None:
     folder = UPLOAD_DIR / asset_id
     if not folder.is_dir():
         return None
-    files = [f for f in folder.iterdir() if f.is_file()]
+    files = [f for f in folder.iterdir()
+             if f.is_file() and f.name != "preview.mp4"
+             and not f.name.startswith("frame-")]
     if not files:
         return None
     path = files[0]
@@ -104,15 +162,31 @@ def load(asset_id: str) -> Asset | None:
         kind, w, h, duration = probe(path)
     except ValueError:
         return None
-    return Asset(id=asset_id, kind=kind, path=path, width=w, height=h, duration=duration)
+    asset = Asset(id=asset_id, kind=kind, path=path, width=w, height=h, duration=duration)
+    try:
+        make_preview(asset)
+    except Exception:  # noqa: BLE001 - pratinjau gagal tidak boleh menggagalkan upload
+        pass
+    return asset
 
 
-def load_many(ids: list[str]) -> list[Asset]:
-    found = [load(i) for i in ids]
-    missing = [i for i, a in zip(ids, found) if a is None]
-    if missing:
-        raise ValueError(f"Aset tidak ditemukan: {', '.join(missing)}")
-    return [a for a in found if a]
+def load_many(refs: list[dict]) -> list[Asset]:
+    """Muat aset beserta batas trim-nya. `refs` berisi {id, start, end}."""
+    out: list[Asset] = []
+    for ref in refs:
+        asset_id = ref["id"] if isinstance(ref, dict) else str(ref)
+        asset = load(asset_id)
+        if asset is None:
+            raise ValueError(f"Aset tidak ditemukan: {asset_id}")
+        if isinstance(ref, dict) and asset.kind == "video":
+            asset.trim_start = max(0.0, min(float(ref.get("start") or 0), asset.duration))
+            end = float(ref.get("end") or 0)
+            asset.trim_end = min(end, asset.duration) if end > 0 else 0.0
+            if asset.usable < 0.5:
+                # Trim yang tidak masuk akal dikembalikan ke klip utuh.
+                asset.trim_start, asset.trim_end = 0.0, 0.0
+        out.append(asset)
+    return out
 
 
 def delete(asset_id: str) -> None:

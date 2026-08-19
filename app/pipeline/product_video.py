@@ -296,8 +296,10 @@ def _render_clip(asset, duration: float, caption: str, out: Path, work: Path,
     else:
         chain.append(f"{last}null[v]")
 
+    # Jangan baca melewati batas trim; sisanya diisi frame beku oleh tpad.
+    ambil = min(duration, asset.usable) if asset.usable > 0 else duration
     run_ffmpeg([
-        "-ss", f"{asset.trim_start:.3f}", "-t", f"{duration:.3f}", "-i", str(asset.path),
+        "-ss", f"{asset.trim_start:.3f}", "-t", f"{ambil:.3f}", "-i", str(asset.path),
         "-filter_complex", ";".join(chain),
         "-map", "[v]", "-an",
         "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", "20", "-pix_fmt", "yuv420p",

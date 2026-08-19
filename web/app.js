@@ -80,20 +80,96 @@ $("jobs").addEventListener("click", async (e) => {
 
 let ASSETS = [];
 
+function fmtDetik(v) {
+  return `${Number(v).toFixed(1)}s`;
+}
+
+function assetCard(a) {
+  const isVideo = a.kind === "video";
+  // Pratinjau memakai frame diam, bukan pemutaran video: rekaman HEVC/MOV dari
+  // ponsel sering tidak bisa diputar browser, sedangkan gambar selalu bisa.
+  const trim = isVideo ? `
+    <div class="trim">
+      <div class="trim-frames">
+        <figure>
+          <img id="img-start-${esc(a.id)}" src="/api/assets/${esc(a.id)}/frame?t=${a.start}" alt="">
+          <figcaption>mulai <span id="lbl-start-${esc(a.id)}">${fmtDetik(a.start)}</span></figcaption>
+        </figure>
+        <figure>
+          <img id="img-end-${esc(a.id)}" src="/api/assets/${esc(a.id)}/frame?t=${Math.max(0, a.end - 0.1)}" alt="">
+          <figcaption>selesai <span id="lbl-end-${esc(a.id)}">${fmtDetik(a.end)}</span></figcaption>
+        </figure>
+      </div>
+      <div class="trim-ctl">
+        <label>Titik mulai
+          <input type="range" data-trim="start" data-id="${esc(a.id)}"
+                 min="0" max="${a.duration}" step="0.1" value="${a.start}">
+        </label>
+        <label>Titik selesai
+          <input type="range" data-trim="end" data-id="${esc(a.id)}"
+                 min="0" max="${a.duration}" step="0.1" value="${a.end}">
+        </label>
+        <div class="trim-meta" id="lbl-len-${esc(a.id)}">terpakai ${fmtDetik(a.end - a.start)}</div>
+      </div>
+    </div>` : "";
+
+  return `<div class="asset">
+    <div class="asset-head">
+      ${isVideo
+        ? `<video src="/api/assets/${esc(a.id)}/preview" muted preload="metadata"></video>`
+        : `<img src="/api/assets/${esc(a.id)}/file" alt="">`}
+      <div class="asset-info">
+        <div class="asset-name">${esc(a.name)}</div>
+        <div class="asset-meta">${isVideo ? `klip ${a.duration}s` : "gambar"}
+          &middot; ${a.width}x${a.height}</div>
+      </div>
+      <button type="button" class="link-btn" data-asset="${esc(a.id)}">Hapus</button>
+    </div>
+    ${trim}
+  </div>`;
+}
+
 function renderAssets() {
   const el = $("assetList");
-  if (!ASSETS.length) { el.innerHTML = ""; return; }
-  el.innerHTML = ASSETS.map((a) => `<div class="asset">
-    ${a.kind === "video"
-      ? `<video src="/api/assets/${esc(a.id)}/file" muted preload="metadata"></video>`
-      : `<img src="/api/assets/${esc(a.id)}/file" alt="">`}
-    <div class="asset-info">
-      <div class="asset-name">${esc(a.name)}</div>
-      <div class="asset-meta">${a.kind === "video" ? `klip ${a.duration}s` : "gambar"}
-        &middot; ${a.width}x${a.height}</div>
-    </div>
-    <button type="button" class="link-btn" data-asset="${esc(a.id)}">Hapus</button>
-  </div>`).join("");
+  el.innerHTML = ASSETS.length ? ASSETS.map(assetCard).join("") : "";
+}
+
+$("assetList").addEventListener("input", (e) => {
+  const id = e.target.dataset?.id;
+  const which = e.target.dataset?.trim;
+  if (!id || !which) return;
+  const a = ASSETS.find((x) => x.id === id);
+  if (!a) return;
+
+  let v = Number(e.target.value);
+  // Jaga jarak minimal 0,5 detik supaya potongannya tidak kosong.
+  if (which === "start") {
+    v = Math.min(v, a.end - 0.5);
+    a.start = Math.max(0, v);
+    e.target.value = a.start;
+  } else {
+    v = Math.max(v, a.start + 0.5);
+    a.end = Math.min(a.duration, v);
+    e.target.value = a.end;
+  }
+
+  $(`lbl-start-${id}`).textContent = fmtDetik(a.start);
+  $(`lbl-end-${id}`).textContent = fmtDetik(a.end);
+  $(`lbl-len-${id}`).textContent = `terpakai ${fmtDetik(a.end - a.start)}`;
+  jadwalkanFrame(a, which);
+});
+
+// Menggeser slider memicu banyak event; permintaan frame ditunda sebentar supaya
+// tidak membanjiri server saat digeser cepat.
+const FRAME_TIMER = {};
+function jadwalkanFrame(a, which) {
+  const key = `${a.id}-${which}`;
+  clearTimeout(FRAME_TIMER[key]);
+  FRAME_TIMER[key] = setTimeout(() => {
+    const t = which === "start" ? a.start : Math.max(0, a.end - 0.1);
+    const img = $(`img-${which}-${a.id}`);
+    if (img) img.src = `/api/assets/${a.id}/frame?t=${t.toFixed(1)}`;
+  }, 130);
 }
 
 $("pFiles").addEventListener("change", async (e) => {
@@ -107,7 +183,8 @@ $("pFiles").addEventListener("change", async (e) => {
     const res = await fetch("/api/assets", { method: "POST", body: fd });
     const body = await res.json();
     if (!res.ok) throw new Error(body.detail || "Upload gagal");
-    ASSETS = ASSETS.concat(body);
+    // Nilai trim awal: klip utuh.
+    ASSETS = ASSETS.concat(body.map((a) => ({ ...a, start: 0, end: a.duration })));
     renderAssets();
     errEl.textContent = "";
   } catch (err) {
@@ -202,7 +279,7 @@ $("formProduct").addEventListener("submit", (e) => {
     voice: $("pVoice").value,
     hook_card: $("pHookCard").checked,
     price_text: $("pPrice").value.trim(),
-    assets: ASSETS.map((a) => a.id),
+    assets: ASSETS.map((a) => ({ id: a.id, start: a.start ?? 0, end: a.end ?? 0 })),
     description: $("pDesc").value.trim(),
   }, "product");
 });

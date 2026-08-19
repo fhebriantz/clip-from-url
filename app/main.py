@@ -41,13 +41,26 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="clip-from-url", lifespan=lifespan)
 
 
+class AssetRef(BaseModel):
+    id: str
+    start: float = Field(default=0.0, ge=0, le=3600)
+    end: float = Field(default=0.0, ge=0, le=3600)
+
+    @field_validator("id")
+    @classmethod
+    def _check_id(cls, v: str) -> str:
+        if not re.fullmatch(r"[0-9a-f]{6,32}", v):
+            raise ValueError(f"ID aset tidak sah: {v}")
+        return v
+
+
 class ProductRequest(BaseModel):
     url: str = Field(min_length=8)
     duration: int = Field(default=30, ge=15, le=60)
     voice: str = "acak"
     hook_card: bool = True
     # Kalau diisi, gambar produk tidak diambil dari halaman marketplace.
-    assets: list[str] = Field(default_factory=list, max_length=12)
+    assets: list[AssetRef] = Field(default_factory=list, max_length=12)
     # Kalau diisi, menggantikan deskripsi hasil scraping.
     description: str = Field(default="", max_length=4000)
     # TikTok Shop tidak pernah mengekspos harga; Shopee kadang juga tidak.
@@ -63,14 +76,6 @@ class ProductRequest(BaseModel):
             detect_source(v)
         except UnsupportedURL as exc:
             raise ValueError(str(exc)) from exc
-        return v
-
-    @field_validator("assets")
-    @classmethod
-    def _check_assets(cls, v: list[str]) -> list[str]:
-        for a in v:
-            if not re.fullmatch(r"[0-9a-f]{6,32}", a):
-                raise ValueError(f"ID aset tidak sah: {a}")
         return v
 
     @field_validator("voice")
@@ -103,7 +108,7 @@ def create_product(req: ProductRequest) -> dict[str, str]:
             "voice": req.voice,
             "hook_card": req.hook_card,
             "price_text": req.price_text,
-            "assets": req.assets,
+            "assets": [a.model_dump() for a in req.assets],
             "description": req.description,
         },
     )
@@ -120,6 +125,27 @@ async def upload_assets(files: list[UploadFile]) -> list[dict[str, Any]]:
         except ValueError as exc:
             raise HTTPException(400, f"{f.filename}: {exc}") from exc
     return hasil
+
+
+@app.get("/api/assets/{asset_id}/preview")
+def asset_preview(asset_id: str) -> FileResponse:
+    """Salinan 480p yang pasti bisa diputar browser; jatuh ke aslinya bila tak ada."""
+    a = assets.load(asset_id)
+    if not a:
+        raise HTTPException(404, "Aset tidak ditemukan")
+    prev = assets.preview_path(asset_id)
+    return FileResponse(prev if prev.is_file() else a.path, media_type="video/mp4")
+
+
+@app.get("/api/assets/{asset_id}/frame")
+def asset_frame(asset_id: str, t: float = 0.0) -> FileResponse:
+    """Satu frame pada detik tertentu, untuk pratinjau slider trim."""
+    a = assets.load(asset_id)
+    if not a:
+        raise HTTPException(404, "Aset tidak ditemukan")
+    if a.kind != "video":
+        return FileResponse(a.path)
+    return FileResponse(assets.frame_at(a, t), media_type="image/jpeg")
 
 
 @app.get("/api/assets/{asset_id}/file")

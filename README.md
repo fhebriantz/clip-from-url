@@ -75,9 +75,26 @@ Perlu diluruskan: fitur ini **tidak mempercepat** pembuatan video. Scraping hany
 sekitar 2% dari total waktu job (1,0 detik baca halaman + 0,6 detik unduh gambar,
 dari job yang memakan 30-120 detik). Nilainya ada di kendali visual, bukan kecepatan.
 
+### Slider trim
+
+Tiap klip punya dua slider: titik mulai dan titik selesai.
+
+Pratinjaunya memakai **frame diam**, bukan pemutaran video. Rekaman HEVC atau MOV
+dari ponsel sering tidak bisa diputar Chrome, sedangkan gambar selalu bisa. Geser
+slider ke detik 6, yang tampil frame detik 6 - tepat, dan tidak bergantung pada
+dukungan codec browser.
+
+Ekstraksi satu frame terukur 57-96 ms dan hasilnya di-cache per 0,1 detik, jadi
+menggeser bolak-balik tidak memanggil FFmpeg berulang (141 ms pertama, 43 ms
+berikutnya). Permintaan juga ditunda 130 ms supaya geseran cepat tidak membanjiri
+server.
+
+Sebuah proxy 480p tetap dibuat saat unggah (sekitar 1 detik untuk klip 10 detik)
+dan dipakai sebagai sumber pengambilan frame, supaya seek-nya cepat.
+
 ### Perlakuan klip video
 
-- Klip dipotong dari detik awal sepanjang narasi scene-nya.
+- Klip dipotong sesuai slider trim; kalau tidak diubah, dipakai dari detik nol.
 - Kalau klip lebih pendek dari narasi, **frame terakhir dibekukan** sampai narasi
   selesai. Dipilih karena tidak pernah terlihat aneh, tidak seperti loop pendek
   atau gerak lambat.
