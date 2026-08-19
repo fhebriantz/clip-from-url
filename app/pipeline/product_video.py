@@ -54,8 +54,7 @@ HOOK_CARD_PAD = 0.45
 # Perkiraan total kartu hook (narasi 3-8 kata + jeda), untuk menghitung sisa scene.
 HOOK_CARD_SECONDS = 2.6
 
-# Tempo bicara diacak tipis supaya beberapa video berurutan tidak terdengar
-# seperti dibacakan oleh mesin yang sama persis.
+# Hanya dipakai kalau jatuh ke cadangan edge-tts; tempo Gemini diatur lewat gaya.
 TTS_RATES = ("+8%", "+12%", "+16%")
 # Perkiraan dari pengukuran: narasi 8-18 kata plus jeda akhir memakan sekitar
 # 4,6-5,9 detik per scene tergantung suara dan panjang kalimat. Durasi akhir
@@ -287,9 +286,11 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     rnd = random.Random(job_id)
     layout = params.get("layout") or rnd.choice(LAYOUTS)
     hook_style = params.get("hook_style") or rnd.choice(list(gemini.HOOK_STYLES))
-    voice = params.get("voice") or "acak"
-    if voice not in tts.VOICES:
-        voice = rnd.choice(list(tts.VOICES))
+    gender = params.get("voice") or "acak"
+    if gender not in tts.VOICES:
+        gender = rnd.choice(list(tts.VOICES))
+    voice_name = rnd.choice(tts.voice_pool(gender))
+    speech_style = params.get("speech_style") or rnd.choice(list(tts.STYLES))
     rate = rnd.choice(TTS_RATES)
 
     report(5, "Membaca halaman produk...")
@@ -328,12 +329,16 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     # jalan berbarengan - jauh lebih cepat daripada satu per satu.
     narrations: list[tuple[str, Path]] = []
     if hook_text:
-        narrations.append((hook_text, work / "voice-hook.mp3"))
-    narrations += [(scene["narration"], work / f"voice-{i:02d}.mp3")
+        narrations.append((hook_text, work / "voice-hook"))
+    narrations += [(scene["narration"], work / f"voice-{i:02d}")
                    for i, scene in enumerate(scenes)]
 
-    report(45, f"Membuat narasi suara ({len(narrations)} bagian, suara {voice})...")
-    audios = tts.synth_many(narrations, voice=voice, rate=rate)
+    report(45, f"Membuat narasi suara ({len(narrations)} bagian, {voice_name} gaya {speech_style})...")
+    tts_meta: dict = {}
+    audios = tts.synth_many(
+        narrations, gender=gender, voice_name=voice_name, style=speech_style,
+        rate=rate, on_status=lambda m: report(45, m), meta=tts_meta,
+    )
 
     durations = [ffprobe_duration(a) for a in audios]
     for i, dur in enumerate(durations):
@@ -405,7 +410,9 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
                f"--- referensi, jangan ikut diposting ---\n"
                f"Harga asli: {product.price_text or 'tidak terbaca'}"
                f"{f' (disebut sebagai {vague})' if vague else ''}\n"
-               f"Variasi: hook {hook_style} - tata letak {layout} - suara {voice} {rate}\n"
+               f"Variasi: hook {hook_style} - tata letak {layout} - suara "
+               f"{tts_meta.get('voice', voice_name)} ({gender}, {tts_meta.get('provider', '?')}) "
+               f"gaya {tts_meta.get('style', speech_style)}\n"
                f"{product.url}",
         score=None,
     )

@@ -144,8 +144,8 @@ pola keluhan yang sama. Karena itu tiap video mengacak empat hal sekaligus:
 |---|---|
 | Gaya hook | keluhan, klaim, POV, banding, nilai, salah-kaprah, demo, rahasia, peringatan |
 | Tata letak | `blur-tengah`, `terang-tengah` (subtitle kuning), `panel-bawah` |
-| Suara | Ardi / Gadis |
-| Tempo bicara | +8% / +12% / +16% |
+| Suara | Puck (pria), Aoede / Zephyr (wanita) |
+| Gaya bicara | energik, antusias, akrab, meyakinkan |
 
 Tata letak dipilih satu per video dan dipakai konsisten di semua scene-nya -
 berganti-ganti di dalam satu video justru terlihat berantakan.
@@ -161,6 +161,36 @@ lengkap dengan narasinya. Gayanya ikut mengikuti tata letak - kalau tidak, semua
 postingan tetap terbuka dengan tampilan yang sama persis, padahal frame pertama
 yang paling menentukan penonton lanjut atau scroll. Bisa dimatikan lewat centang
 di UI.
+
+## Suara narator
+
+Narasi memakai **Gemini TTS**, bukan edge-tts. Alasannya edge-tts hanya punya dua
+suara Indonesia dan keduanya terdengar datar - dari sepuluh sampel yang diukur,
+`id-ID-ArdiNeural` justru paling monoton (variasi dinamika 0,47, terendah).
+
+Gemini juga bisa diperintah gaya bicaranya lewat kalimat biasa, jadi gaya ikut
+jadi sumbu variasi antar video.
+
+### Batas kuota, dan kenapa narasinya diminta sekali
+
+Tier gratis Gemini membatasi **jumlah request**, bukan panjang audionya. Satu video
+berisi 5-6 kalimat; kalau diminta satu per satu, jatah harian habis hanya dalam
+beberapa video.
+
+Karena itu seluruh narasi diminta dalam **satu request**, lalu dipotong sendiri di
+jeda antar kalimat memakai `silencedetect`. Pemotongannya diverifikasi jatuh tepat
+di hening, bukan di tengah kata. Hemat request sekitar 5x.
+
+Kalau kuota tetap habis (`429`), narasi otomatis jatuh ke edge-tts supaya job tidak
+gagal. Mesin yang benar-benar terpakai dicatat di riwayat, jadi kamu tahu video mana
+yang memakai suara cadangan:
+
+```
+Variasi: hook klaim - tata letak terang-tengah - suara id-ID-ArdiNeural (pria, edge) gaya rate +8%
+```
+
+Untuk memakai edge-tts sepenuhnya (gratis tanpa kuota), set `TTS_PROVIDER=edge` di
+`.env`.
 
 ### Musik latar sengaja tidak ada
 
