@@ -1,6 +1,7 @@
 """Klien Gemini: menulis naskah video promosi dari data produk."""
 from __future__ import annotations
 
+import re
 import time
 from typing import Callable
 
@@ -62,10 +63,10 @@ _SCRIPT_PROMPT = """Kamu penulis naskah video afiliasi untuk TikTok dan Reels, a
 
 Tulis naskah video vertikal berdurasi sekitar {duration} detik untuk produk berikut.
 
-Produk    : {title}
-Harga     : {price}
-Toko      : {shop}
-Deskripsi : {description}
+Produk        : {title}
+Kisaran harga : {price}
+Toko          : {shop}
+Deskripsi     : {description}
 
 Buat TEPAT {scenes} scene. Aturan:
 - Scene pertama adalah hook: langsung ke masalah atau manfaat, jangan basa-basi
@@ -75,7 +76,13 @@ Buat TEPAT {scenes} scene. Aturan:
 - Setiap narration 8-18 kata, satu kalimat, enak dibaca mesin text-to-speech.
   Jangan pakai emoji, tanda kurung, atau singkatan aneh.
 - caption adalah teks yang muncul di layar: maksimal 5 kata, huruf kapital di awal saja.
-- Sebut harga persis sekali, di scene yang paling pas.
+- Sebut kisaran harga TEPAT SEKALI, di scene yang paling pas, dan tulis PERSIS
+  seperti yang tertera di atas (contoh: "90 ribuan").
+- DILARANG KERAS menyebut angka harga yang spesifik dalam bentuk apa pun, baik
+  angka maupun huruf. Jangan tulis "92.000", "Rp92.000", atau "sembilan puluh dua
+  ribu". TikTok melarangnya karena harga sering sudah berubah saat video ditonton.
+  Larangan ini berlaku juga untuk caption dan post_caption.
+- Kalau kisaran harga di atas kosong, jangan menyebut harga sama sekali.
 - Scene terakhir berisi ajakan cek link di bio atau keranjang kuning.
 - post_caption dan hashtags untuk diposting bersama videonya. Hashtag tanpa tanda pagar.
 
@@ -87,9 +94,10 @@ def write_product_script(product: dict, scenes: int, duration: int,
     """Minta Gemini menulis naskah video promosi dari data produk."""
     client = _client()
     desc = (product.get("description") or "").strip()[:1500] or "(tidak tersedia)"
+    vague = str(product.get("price_vague") or "").strip()
     prompt = _SCRIPT_PROMPT.format(
         title=product.get("title") or "-",
-        price=product.get("price_text") or "(tidak diketahui, jangan sebut harga)",
+        price=vague or "(tidak diketahui, jangan sebut harga)",
         shop=product.get("shop") or "-",
         description=desc,
         scenes=scenes,
@@ -114,7 +122,8 @@ def write_product_script(product: dict, scenes: int, duration: int,
                         temperature=0.9,
                     ),
                 )
-                return _clean_script(resp.parsed or {}, scenes)
+                return _clean_script(resp.parsed or {}, scenes, vague,
+                                     product.get("price"))
             except (genai_errors.ServerError, genai_errors.ClientError) as exc:
                 last = exc
                 code = getattr(exc, "code", None)
@@ -128,21 +137,47 @@ def write_product_script(product: dict, scenes: int, duration: int,
     raise RuntimeError(f"Semua model Gemini menolak permintaan naskah. Terakhir: {last}")
 
 
-def _clean_script(data: dict, wanted: int) -> dict:
+# Jaring pengaman kalau model tetap menuliskan angka harga meski sudah dilarang.
+_RP_RE = re.compile(r"(?:rp\.?\s*)?\d{1,3}(?:[.,\s]\d{3})+(?:\s*(?:rupiah|perak))?", re.I)
+_RP_PLAIN_RE = re.compile(r"rp\.?\s*\d+(?:\s*(?:ribu|rb|k))?", re.I)
+# Model kadang membulatkan sendiri dan meleset, misal menulis "190 ribuan" untuk
+# harga 189.000. Sebutan kisaran diseragamkan ke hasil hitungan kita.
+_VAGUE_RE = re.compile(r"\b\d{1,4}\s*(?:ribuan|rb-?an|jutaan)\b", re.I)
+
+
+def _exact_re(value: int) -> re.Pattern:
+    """Cocokkan angka harga apa adanya, dengan pemisah ribuan bebas."""
+    return re.compile(r"(?:rp\.?\s*)?" + r"[.,\s]?".join(str(value)), re.I)
+
+
+def _scrub_price(text: str, vague: str, exact: int | None) -> str:
+    """Ganti angka harga spesifik dengan sebutan kisaran."""
+    if not text:
+        return text
+    repl = vague or ""
+    if exact:
+        text = _exact_re(exact).sub(repl, text)
+    text = _RP_RE.sub(repl, text)
+    text = _RP_PLAIN_RE.sub(repl, text)
+    text = _VAGUE_RE.sub(repl, text)
+    return re.sub(r"\s{2,}", " ", text).strip()
+
+
+def _clean_script(data: dict, wanted: int, vague: str = "", exact: int | None = None) -> dict:
     scenes = []
     for s in (data.get("scenes") or []):
-        narration = str(s.get("narration") or "").strip()
+        narration = _scrub_price(str(s.get("narration") or "").strip(), vague, exact)
         if not narration:
             continue
         scenes.append({
             "narration": narration,
-            "caption": str(s.get("caption") or "").strip()[:40],
+            "caption": _scrub_price(str(s.get("caption") or "").strip(), vague, exact)[:40],
         })
     if not scenes:
         raise RuntimeError("Gemini tidak menghasilkan scene yang bisa dipakai.")
     return {
         "hook": str(data.get("hook") or scenes[0]["caption"]).strip(),
         "scenes": scenes[:wanted],
-        "post_caption": str(data.get("post_caption") or "").strip(),
+        "post_caption": _scrub_price(str(data.get("post_caption") or "").strip(), vague, exact),
         "hashtags": [str(h).lstrip("#").strip() for h in (data.get("hashtags") or []) if str(h).strip()][:12],
     }

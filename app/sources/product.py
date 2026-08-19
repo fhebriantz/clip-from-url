@@ -54,7 +54,9 @@ class Product:
     images: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        data["price_vague"] = price_vague(self.price)
+        return data
 
 
 class UnsupportedURL(ValueError):
@@ -129,6 +131,22 @@ def _parse_rupiah(text: str) -> tuple[str, int | None]:
         if 1_000 <= value <= 500_000_000:
             return f"Rp{value:,}".replace(",", "."), value
     return "", None
+
+
+def price_vague(value: int | None) -> str:
+    """Ubah harga jadi sebutan kasar, misal 92.000 -> "90 ribuan".
+
+    TikTok melarang penyebutan harga yang spesifik: harga saat video ditonton
+    sering sudah berbeda dari harga saat video dibuat. Pembulatan selalu ke
+    BAWAH supaya tidak pernah terdengar lebih mahal dari harga sebenarnya.
+    """
+    if not value or value < 1_000:
+        return ""
+    if value >= 1_000_000:
+        return f"{value // 1_000_000} jutaan"
+    if value >= 10_000:
+        return f"{(value // 10_000) * 10} ribuan"
+    return f"{value // 1_000} ribuan"
 
 
 def parse_price_input(text: str) -> tuple[str, int | None]:

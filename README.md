@@ -62,6 +62,30 @@ Kalau harga tidak terbaca, isi kolom **Harga** di UI (boleh `599000` atau `Rp599
 Nilai yang diketik selalu menang atas hasil ekstraksi. Kalau dikosongkan dan memang
 tidak terbaca, naskah dibuat tanpa menyebut harga.
 
+### Penyebutan harga sengaja dikaburkan
+
+TikTok melarang penyebutan harga yang spesifik, karena harga saat video ditonton
+sering sudah berbeda dari harga saat video dibuat. Naskah karena itu hanya menyebut
+kisaran, dibulatkan **ke bawah** supaya tidak pernah terdengar lebih mahal:
+
+| Harga asli | Disebut |
+|---|---|
+| 5.700 | 5 ribuan |
+| 27.500 | 20 ribuan |
+| 92.000 | 90 ribuan |
+| 137.000 | 130 ribuan |
+| 599.000 | 590 ribuan |
+| 1.250.000 | 1 jutaan |
+
+Aturannya: harga di bawah 10 ribu dibulatkan ke kelipatan seribu, di atasnya ke
+kelipatan sepuluh ribu, dan mulai satu juta disebut dalam jutaan.
+
+Selain lewat perintah ke model, hasilnya juga disaring ulang di kode: angka harga
+yang terlanjur muncul (`Rp92.000`, `92.000`, `92000`) diganti otomatis dengan
+sebutan kisaran, termasuk kalau model salah membulatkan sendiri. Harga aslinya
+tetap ditampilkan di UI sebagai referensi, di bawah pemisah yang menandai bagian
+itu tidak untuk ikut diposting.
+
 ### TikTok Shop
 
 Halaman produknya diblokir captcha "Security Check" - termasuk lewat user-agent

@@ -18,7 +18,7 @@ import httpx
 
 from ..config import ASSETS_DIR, OUTPUT_DIR, WORK_DIR
 from ..services import gemini, tts
-from ..sources.product import _HEADERS, extract, parse_price_input
+from ..sources.product import _HEADERS, extract, parse_price_input, price_vague
 from ..tools import ensure_ffmpeg, ffprobe_duration, run_ffmpeg
 
 Report = Callable[[int, str], None]
@@ -193,6 +193,7 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
         if not product.price_text:
             raise RuntimeError(f"Harga \"{manual}\" tidak dikenali. Contoh: 599000 atau Rp599.000")
 
+    vague = price_vague(product.price)
     report(12, f"Produk: {product.title[:50]}")
 
     work = WORK_DIR / job_id
@@ -277,8 +278,10 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
         start_s=0.0,
         end_s=round(total, 2),
         label=script["hook"],
-        reason=f"{script['post_caption']}\n{tags}\n\nSumber: {product.price_text or 'harga tidak terbaca'}"
-               f" - {product.url}",
+        reason=f"{script['post_caption']}\n{tags}\n\n"
+               f"--- referensi, jangan ikut diposting ---\n"
+               f"Harga asli: {product.price_text or 'tidak terbaca'}"
+               f"{f' (disebut sebagai {vague})' if vague else ''}\n{product.url}",
         score=None,
     )
 
