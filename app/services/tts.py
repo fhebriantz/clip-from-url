@@ -59,6 +59,15 @@ _SILENCE_DB = -34
 _SILENCE_MIN = 0.28
 _PART_MIN = 0.8
 
+# Konsonan letup (p, t, k) diawali hentakan sangat pendek berenergi rendah, jadi
+# silencedetect menandainya sebagai bagian dari hening. Memotong tepat di titik
+# deteksi ikut membuang hentakan itu - "POV" terdengar jadi "OV". Karena itu tiap
+# potongan dimulai sedikit lebih awal dan diakhiri sedikit lebih lambat.
+_LEAD_MARGIN = 0.12
+_TAIL_MARGIN = 0.06
+# Hening pembuka supaya narasi tidak menempel di sampel paling pertama.
+_INTRO_SILENCE = 0.15
+
 
 def voice_pool(gender: str) -> tuple[str, ...]:
     return VOICES.get(gender, VOICES[DEFAULT_VOICE])
@@ -101,13 +110,13 @@ def _silences(path: Path) -> list[tuple[float, float]]:
     return spans
 
 
-def _cut(src: Path, start: float, end: float, out: Path) -> None:
-    subprocess.run(
-        [str(ensure_ffmpeg()), "-hide_banner", "-loglevel", "error", "-y",
-         "-i", str(src), "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
-         "-c:a", "pcm_s16le", "-ar", str(SAMPLE_RATE), "-ac", "1", str(out)],
-        check=True, capture_output=True,
-    )
+def _cut(src: Path, start: float, end: float, out: Path, lead: float = 0.0) -> None:
+    args = [str(ensure_ffmpeg()), "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(src), "-ss", f"{start:.3f}", "-to", f"{end:.3f}"]
+    if lead > 0:
+        args += ["-af", f"adelay={int(lead * 1000)}:all=1"]
+    args += ["-c:a", "pcm_s16le", "-ar", str(SAMPLE_RATE), "-ac", "1", str(out)]
+    subprocess.run(args, check=True, capture_output=True)
 
 
 def _split_audio(src: Path, stems: list[Path]) -> list[Path]:
@@ -126,10 +135,12 @@ def _split_audio(src: Path, stems: list[Path]) -> list[Path]:
     # Hening di awal dan akhir berkas dibuang seluruhnya.
     head = spans[0][1] if spans and spans[0][0] <= 0.05 else 0.0
     tail = spans[-1][0] if spans and spans[-1][1] >= total - 0.05 else total
+    head = max(0.0, head - _LEAD_MARGIN)
+    tail = min(total, tail + _TAIL_MARGIN)
 
     if n == 1:
         out = stems[0].with_suffix(".wav")
-        _cut(src, head, tail, out)
+        _cut(src, head, tail, out, lead=_INTRO_SILENCE)
         _check(out)
         src.unlink(missing_ok=True)
         return [out]
@@ -143,12 +154,21 @@ def _split_audio(src: Path, stems: list[Path]) -> list[Path]:
 
     outs: list[Path] = []
     for i, stem in enumerate(stems):
-        start = head if i == 0 else seps[i - 1][1]
-        end = tail if i == n - 1 else seps[i][0]
+        if i == 0:
+            start = head
+        else:
+            prev = seps[i - 1]
+            # Mundur sedikit, tapi jangan sampai masuk ke kalimat sebelumnya.
+            start = max(prev[1] - _LEAD_MARGIN, prev[0] + 0.02)
+        if i == n - 1:
+            end = tail
+        else:
+            nxt = seps[i]
+            end = min(nxt[0] + _TAIL_MARGIN, nxt[1] - 0.02)
         if end - start < _PART_MIN:
             raise RuntimeError("Pembagian narasi menghasilkan potongan terlalu pendek.")
         out = stem.with_suffix(".wav")
-        _cut(src, start, end, out)
+        _cut(src, start, end, out, lead=_INTRO_SILENCE if i == 0 else 0.0)
         _check(out)
         outs.append(out)
     return outs

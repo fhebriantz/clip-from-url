@@ -51,8 +51,12 @@ LAYOUTS = ("blur-tengah", "terang-tengah", "panel-bawah")
 
 # Jeda hening yang ditambahkan di akhir tiap bagian. Nilai yang sama dipakai untuk
 # video DAN audionya, supaya keduanya tidak pernah bergeser satu sama lain.
-HOOK_CARD_PAD = 0.35
-SCENE_GAP = 0.25
+#
+# Angkanya kecil karena tiap potongan narasi sudah membawa margin sendiri di
+# ujungnya (0,12 detik di depan + 0,06 detik di belakang, supaya konsonan letup
+# tidak terpotong). Jeda terdengar di video jadi sekitar 0,28 detik.
+HOOK_CARD_PAD = 0.20
+SCENE_GAP = 0.10
 # Terukur: hook 3-8 kata terbaca sekitar 2,8 detik, ditambah jedanya.
 HOOK_CARD_SECONDS = 3.1
 
