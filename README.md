@@ -43,8 +43,19 @@ URL produk --> ekstraksi HTML --> {judul, harga, gambar, deskripsi}
 ```
 
 Durasi tiap scene mengikuti panjang audionya, jadi narasi tidak pernah terpotong.
-Jumlah scene dihitung dari target durasi dengan perkiraan 5 detik per scene, jadi
-hasil akhirnya bisa meleset beberapa detik.
+Jumlah scene dihitung dari target durasi, jadi hasil akhirnya meleset beberapa detik
+(target 20 detik menghasilkan sekitar 18 detik).
+
+Jeda antar kalimat ditentukan pipeline (0,25 detik antar scene, 0,35 detik setelah
+kartu hook), bukan diambil dari hening bawaan mesin suara. Hening bawaan justru
+dibuang lebih dulu: pemotongan narasi dilakukan tepat di tepi bicara, bukan di
+tengah heningnya. Kalau dipotong di tengah, separuh jeda ikut terbawa di ujung tiap
+potongan dan muncul lagi utuh saat disambung - terdengar seperti narator berhenti
+kelamaan.
+
+Jeda yang sama juga ditambahkan ke audionya sebelum disambung, sehingga total audio
+persis sama dengan total video. Tanpa ini audio bergeser 0,35 detik tiap scene dan
+suaranya terdengar hilang-muncul.
 
 Suara narator memakai `edge-tts` (gratis, tanpa API key): Ardi (pria) atau
 Gadis (wanita).

@@ -49,10 +49,12 @@ ZOOM_RANGE = 0.12
 # itu sendiri - berganti-ganti antar scene malah terlihat berantakan).
 LAYOUTS = ("blur-tengah", "terang-tengah", "panel-bawah")
 
-# Durasi kartu hook di awal video, di luar durasi narasinya.
-HOOK_CARD_PAD = 0.45
-# Perkiraan total kartu hook (narasi 3-8 kata + jeda), untuk menghitung sisa scene.
-HOOK_CARD_SECONDS = 2.6
+# Jeda hening yang ditambahkan di akhir tiap bagian. Nilai yang sama dipakai untuk
+# video DAN audionya, supaya keduanya tidak pernah bergeser satu sama lain.
+HOOK_CARD_PAD = 0.35
+SCENE_GAP = 0.25
+# Terukur: hook 3-8 kata terbaca sekitar 2,8 detik, ditambah jedanya.
+HOOK_CARD_SECONDS = 3.1
 
 # Hanya dipakai kalau jatuh ke cadangan edge-tts; tempo Gemini diatur lewat gaya.
 TTS_RATES = ("+8%", "+12%", "+16%")
@@ -61,7 +63,9 @@ TTS_RATES = ("+8%", "+12%", "+16%")
 # jadi angkanya beda per mesin suara. Ini perkiraan, bukan jaminan: durasi akhir
 # tetap bisa meleset beberapa detik dari target.
 SECONDS_PER_SCENE_EDGE = 5.0
-SECONDS_PER_SCENE_GEMINI = 7.0
+# Terukur setelah hening bawaan dibuang: narasi Gemini sekitar 4,9 detik per
+# scene, ditambah jeda 0,25 detik.
+SECONDS_PER_SCENE_GEMINI = 5.15
 
 
 def _seconds_per_scene() -> float:
@@ -359,14 +363,17 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     workers = min(RENDER_PARALLEL, len(clips))
     report(52, f"Membuat {len(clips)} bagian ({workers} paralel, {layout})...")
 
+    # Jeda per bagian; dipakai bersama oleh video dan audio agar tetap sinkron.
+    pads = [HOOK_CARD_PAD if (hook_text and i == 0) else SCENE_GAP
+            for i in range(len(clips))]
+
     def render_one(i: int) -> int:
         if hook_text and i == 0:
-            _render_hook_card(images[0], durations[0] + HOOK_CARD_PAD,
+            _render_hook_card(images[0], durations[0] + pads[0],
                               hook_text, clips[0], work, layout=layout)
         else:
             j = i - offset
-            # Jeda kecil di akhir agar potongan tidak terasa terburu-buru.
-            _render_scene(images[j % len(images)], durations[i] + 0.35,
+            _render_scene(images[j % len(images)], durations[i] + pads[i],
                           scenes[j]["caption"], clips[i], work, j, layout=layout)
         return i
 
@@ -392,11 +399,15 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     args = ["-f", "concat", "-safe", "0", "-i", str(listing)]
     for a in audios:
         args += ["-i", str(a)]
-    audio_inputs = "".join(f"[{i + 1}:a]" for i in range(len(audios)))
+    # Tiap potongan audio diberi hening sepanjang jeda video-nya, baru disambung.
+    # Dengan begitu total audio persis sama dengan total video.
+    padded = "".join(
+        f"[{i + 1}:a]apad=pad_dur={pads[i]}[pa{i}];" for i in range(len(audios))
+    )
+    joined = "".join(f"[pa{i}]" for i in range(len(audios)))
     args += [
         "-filter_complex",
-        f"{audio_inputs}concat=n={len(audios)}:v=0:a=1[a];"
-        "[a]adelay=0|0,apad=pad_dur=0.35[aout]",
+        f"{padded}{joined}concat=n={len(audios)}:v=0:a=1[aout]",
         "-map", "0:v", "-map", "[aout]",
         "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
         # Naikkan ke 44.1 kHz stereo: sebagian platform menolak mono 24 kHz.

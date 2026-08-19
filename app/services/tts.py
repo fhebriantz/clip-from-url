@@ -110,32 +110,44 @@ def _cut(src: Path, start: float, end: float, out: Path) -> None:
 
 
 def _split_audio(src: Path, stems: list[Path]) -> list[Path]:
-    """Potong satu berkas narasi jadi beberapa bagian di jeda terpanjang."""
-    n = len(stems)
-    if n == 1:
-        out = stems[0].with_suffix(".wav")
-        src.replace(out)
-        return [out]
+    """Potong narasi jadi beberapa bagian, tepat pada batas bicara.
 
+    Pemotongan diambil di TEPI hening, bukan di tengahnya. Kalau dipotong di
+    tengah, separuh jeda ikut terbawa di ujung tiap potongan dan jedanya muncul
+    utuh lagi saat disambung - terdengar seperti narator berhenti kelamaan.
+    Jarak antar kalimat pada video ditentukan sendiri oleh pipeline, bukan oleh
+    panjang hening bawaan dari mesin suara.
+    """
+    n = len(stems)
     total = ffprobe_duration(src)
     spans = _silences(src)
-    # Abaikan hening di ujung; yang dicari pemisah antar kalimat.
-    inner = [sp for sp in spans if sp[0] > 0.25 and sp[1] < total - 0.25]
+
+    # Hening di awal dan akhir berkas dibuang seluruhnya.
+    head = spans[0][1] if spans and spans[0][0] <= 0.05 else 0.0
+    tail = spans[-1][0] if spans and spans[-1][1] >= total - 0.05 else total
+
+    if n == 1:
+        out = stems[0].with_suffix(".wav")
+        _cut(src, head, tail, out)
+        _check(out)
+        src.unlink(missing_ok=True)
+        return [out]
+
+    inner = [sp for sp in spans if sp[0] > head + 0.05 and sp[1] < tail - 0.05]
     if len(inner) < n - 1:
-        raise RuntimeError(
-            f"Hanya menemukan {len(inner)} jeda untuk {n} bagian narasi."
-        )
+        raise RuntimeError(f"Hanya menemukan {len(inner)} jeda untuk {n} bagian narasi.")
 
     inner.sort(key=lambda sp: sp[1] - sp[0], reverse=True)
-    cuts = sorted((a + b) / 2 for a, b in inner[: n - 1])
-    bounds = [0.0, *cuts, total]
+    seps = sorted(inner[: n - 1])
 
     outs: list[Path] = []
     for i, stem in enumerate(stems):
-        if bounds[i + 1] - bounds[i] < _PART_MIN:
+        start = head if i == 0 else seps[i - 1][1]
+        end = tail if i == n - 1 else seps[i][0]
+        if end - start < _PART_MIN:
             raise RuntimeError("Pembagian narasi menghasilkan potongan terlalu pendek.")
         out = stem.with_suffix(".wav")
-        _cut(src, bounds[i], bounds[i + 1], out)
+        _cut(src, start, end, out)
         _check(out)
         outs.append(out)
     return outs
@@ -145,8 +157,9 @@ def _gemini_one(client: genai.Client, text: str, voice_name: str, style: str,
                 stem: Path, multi: bool = False) -> Path:
     instruction = STYLES.get(style, STYLES[DEFAULT_STYLE])
     if multi:
-        # Jeda antar kalimat harus jelas supaya pemotongan otomatis tidak meleset.
-        instruction += ". Beri jeda hening yang jelas di antara tiap kalimat"
+        # Jeda dibutuhkan hanya sebagai penanda potong; panjangnya tidak penting
+        # karena hening di tiap ujung potongan dibuang lagi setelah dipisah.
+        instruction += ". Beri jeda singkat di antara tiap kalimat"
     delay = 4.0
     last: Exception | None = None
     for attempt in range(1, _ATTEMPTS + 1):
