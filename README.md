@@ -292,6 +292,23 @@ persis di scene pertama, sehingga penonton mendengar kalimat yang sama dua kali
 (kartu hook membacakan hook, lalu scene 1 mengulangnya). Diatasi dengan aturan
 eksplisit di prompt, bukan dengan mengembalikan thinking.
 
+### Rotasi model
+
+Kalau model utama menolak dengan `429` (kuota habis) atau `500`/`502`/`503`/`504`
+(sedang sibuk), permintaan otomatis pindah ke model cadangan. Tiap model dicoba 3
+kali dengan jeda menaik sebelum menyerah dan pindah:
+
+```
+gemini-3.6-flash -> gemini-3.5-flash -> gemini-3-flash-preview
+```
+
+Urutannya mengikuti `GEMINI_MODEL` di `.env` sebagai yang pertama.
+
+Indikator di pojok kanan atas menampilkan model utama beserta jumlah cadangannya,
+dan **berubah menandai kondisi cadangan** kalau job terakhir ternyata dikerjakan
+model lain. Arahkan kursor ke situ untuk melihat urutan lengkapnya. Panel pemakaian
+di bawah mencatat model mana saja yang benar-benar terpakai hari ini.
+
 ### Pilihan model penting
 
 `gemini-3.6-flash` (bawaan) menuruti setelan thinking `low` dengan konsisten.

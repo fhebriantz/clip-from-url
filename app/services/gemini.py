@@ -49,6 +49,11 @@ def _record(model: str, resp, note: str = "") -> None:
                  note=note)
 
 
+def model_chain() -> list[str]:
+    """Urutan model yang dicoba: utama dulu, lalu cadangan saat sibuk atau kuota habis."""
+    return _model_chain()
+
+
 def _model_chain() -> list[str]:
     chain = [GEMINI_MODEL]
     chain += [m for m in _FALLBACKS if m != GEMINI_MODEL]

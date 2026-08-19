@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from . import assets, db, usage, worker
+from .services import gemini as gemini_service
 from .services import tts
 from .sources.product import UnsupportedURL, detect_source
 from .config import (
@@ -92,7 +93,13 @@ def health() -> dict[str, Any]:
     return {
         "ffmpeg": find_binary("ffmpeg") is not None,
         "gemini_key": bool(GEMINI_API_KEY),
+        # Model utama dari .env, urutan cadangannya, dan yang BENAR-BENAR dipakai
+        # terakhir kali. Tiga hal berbeda: menampilkan yang pertama saja membuat
+        # panel terlihat pasti padahal job bisa saja berjalan di model lain.
         "model": GEMINI_MODEL,
+        "model_chain": gemini_service.model_chain(),
+        "model_terpakai": db.last_used_model("naskah"),
+        "tts_terpakai": db.last_used_model("suara"),
     }
 
 

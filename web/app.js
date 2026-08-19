@@ -14,9 +14,19 @@ async function checkHealth() {
     const h = await (await fetch("/api/health")).json();
     const parts = [];
     parts.push(h.ffmpeg ? '<span class="good">FFmpeg</span>' : '<span class="bad">FFmpeg hilang</span>');
-    parts.push(h.gemini_key
-      ? `<span class="good">${esc(h.model)}</span>`
-      : '<span class="bad">GEMINI_API_KEY kosong (isi .env)</span>');
+    if (!h.gemini_key) {
+      parts.push('<span class="bad">GEMINI_API_KEY kosong (isi .env)</span>');
+    } else {
+      const rantai = (h.model_chain || [h.model]).join(" -> ");
+      const cadangan = Math.max(0, (h.model_chain || []).length - 1);
+      const judul = `Model utama: ${h.model}\nUrutan saat sibuk atau kuota habis:\n${rantai}`;
+      // Kalau job terakhir ternyata jalan di model lain, itu yang ditampilkan -
+      // menyebut model utama saja akan menyesatkan.
+      const beda = h.model_terpakai && h.model_terpakai !== h.model;
+      parts.push(beda
+        ? `<span class="warn" title="${esc(judul)}">${esc(h.model_terpakai)} (cadangan, utama ${esc(h.model)})</span>`
+        : `<span class="good" title="${esc(judul)}">${esc(h.model)}${cadangan ? ` +${cadangan} cadangan` : ""}</span>`);
+    }
     $("status").innerHTML = parts.join(" &middot; ");
   } catch {
     $("status").innerHTML = '<span class="bad">Server tidak merespons</span>';

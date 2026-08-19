@@ -176,6 +176,16 @@ def asset_refs() -> dict[str, str]:
     return terbaru
 
 
+def last_used_model(kind: str) -> str:
+    """Model yang benar-benar dipakai terakhir kali untuk jenis panggilan ini."""
+    with _lock:
+        row = _db().execute(
+            "SELECT model FROM usage WHERE kind=? AND ok=1 ORDER BY created_at DESC LIMIT 1",
+            (kind,),
+        ).fetchone()
+    return row["model"] if row else ""
+
+
 def usage_notes(day: str) -> dict[str, str]:
     """Catatan terakhir per model, misal penanda thinking yang tidak dibatasi."""
     with _lock:
