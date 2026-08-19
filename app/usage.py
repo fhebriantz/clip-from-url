@@ -26,8 +26,16 @@ PRICING: dict[str, tuple[float, float]] = {
 }
 _FALLBACK = (0.75, 3.75)
 
-# Batas tier gratis per model per hari, dari pesan galat 429.
+# Batas tier gratis per model per hari, dibaca dari pesan galat 429. Tidak sama
+# untuk semua model: model TTS jauh lebih ketat daripada model teks.
 FREE_TIER_PER_MODEL = 20
+FREE_TIER_OVERRIDE: dict[str, int] = {
+    "gemini-3.1-flash-tts-preview": 10,
+}
+
+
+def free_tier_limit(model: str) -> int:
+    return FREE_TIER_OVERRIDE.get(model, FREE_TIER_PER_MODEL)
 
 
 def price_of(model: str) -> tuple[float, float]:
@@ -60,12 +68,13 @@ def summary() -> dict[str, Any]:
     models = []
     for row in hari_ini:
         dipakai = row["requests"]
+        batas = free_tier_limit(row["model"])
         models.append({
             "model": row["model"],
             "requests": dipakai,
-            "limit": FREE_TIER_PER_MODEL,
-            "sisa": max(0, FREE_TIER_PER_MODEL - dipakai),
-            "habis": dipakai >= FREE_TIER_PER_MODEL,
+            "limit": batas,
+            "sisa": max(0, batas - dipakai),
+            "habis": dipakai >= batas,
             "in_tokens": row["in_tokens"],
             "out_tokens": row["out_tokens"],
             "cost_usd": row["cost_usd"],

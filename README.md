@@ -319,8 +319,16 @@ naskah naik sekitar 10x. Panel pemakaian di UI menandai kondisi ini dengan label
 
 ### Batas tier gratis
 
-Pesan galat kuota menyebut **20 request per hari per model**. Satu video memakai 2
-request (satu naskah, satu narasi), jadi 10 video sehari masih muat tanpa bayar.
+Batasnya berbeda per model, dibaca dari pesan galat `429`:
+
+| Model | Request per hari |
+|---|---|
+| `gemini-3.6-flash` (naskah) | 20 |
+| `gemini-2.5-flash-preview-tts` | 20 |
+| `gemini-3.1-flash-tts-preview` | **10** |
+
+Satu video memakai 2 request: satu naskah, satu narasi. Dengan TTS 3.1, jatah
+gratisnya pas 10 video sehari tanpa sisa; dengan TTS 2.5 jadi 20 video.
 
 ## Suara narator
 
