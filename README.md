@@ -172,7 +172,7 @@ pola keluhan yang sama. Karena itu tiap video mengacak empat hal sekaligus:
 |---|---|
 | Gaya hook | keluhan, klaim, POV, banding, nilai, salah-kaprah, demo, rahasia, peringatan |
 | Tata letak | `blur-tengah`, `terang-tengah` (subtitle kuning), `panel-bawah` |
-| Suara | Puck (pria), Aoede / Zephyr (wanita) |
+| Suara | Puck / Alnilam (pria), Zephyr / Aoede (wanita) |
 | Gaya bicara | energik, antusias, akrab, meyakinkan |
 
 Tata letak dipilih satu per video dan dipakai konsisten di semua scene-nya -
@@ -241,6 +241,10 @@ suara Indonesia dan keduanya terdengar datar - dari sepuluh sampel yang diukur,
 
 Gemini juga bisa diperintah gaya bicaranya lewat kalimat biasa, jadi gaya ikut
 jadi sumbu variasi antar video.
+
+Suara yang dipakai: **Puck** dan **Alnilam** untuk pria, **Zephyr** dan **Aoede**
+untuk wanita. Di UI bisa dipilih acak semua, acak dalam satu jenis, atau dikunci
+ke satu suara tertentu.
 
 ### Batas kuota, dan kenapa narasinya diminta sekali
 

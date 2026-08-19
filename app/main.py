@@ -62,8 +62,9 @@ class ProductRequest(BaseModel):
     @field_validator("voice")
     @classmethod
     def _check_voice(cls, v: str) -> str:
-        if v != "acak" and v not in tts.VOICES:
-            raise ValueError(f"Suara harus 'acak' atau salah satu dari: {', '.join(tts.VOICES)}")
+        sah = ("acak", *tts.VOICES, *tts.ALL_VOICES)
+        if v not in sah:
+            raise ValueError(f"Suara harus salah satu dari: {', '.join(sah)}")
         return v
 
 

@@ -24,11 +24,12 @@ from .. import usage
 from ..config import GEMINI_API_KEY, GEMINI_TTS_MODEL, TTS_PROVIDER
 from ..tools import ensure_ffmpeg, ffprobe_duration
 
-# Suara Gemini per jenis kelamin. Dipilih dari hasil uji dengar.
+# Suara Gemini per jenis kelamin, dipilih dari hasil uji dengar.
 VOICES: dict[str, tuple[str, ...]] = {
-    "pria": ("Puck",),
-    "wanita": ("Aoede", "Zephyr"),
+    "pria": ("Puck", "Alnilam"),
+    "wanita": ("Zephyr", "Aoede"),
 }
+ALL_VOICES: tuple[str, ...] = tuple(v for pool in VOICES.values() for v in pool)
 EDGE_VOICES = {"pria": "id-ID-ArdiNeural", "wanita": "id-ID-GadisNeural"}
 DEFAULT_VOICE = "pria"
 DEFAULT_RATE = "+12%"
@@ -62,6 +63,28 @@ _PART_MIN = 0.8
 
 def voice_pool(gender: str) -> tuple[str, ...]:
     return VOICES.get(gender, VOICES[DEFAULT_VOICE])
+
+
+def gender_of(voice_name: str) -> str:
+    """Jenis kelamin sebuah nama suara Gemini, atau string kosong kalau tak dikenal."""
+    for gender, pool in VOICES.items():
+        if voice_name in pool:
+            return gender
+    return ""
+
+
+def resolve(choice: str, rnd) -> tuple[str, str]:
+    """Ubah pilihan pengguna jadi (jenis kelamin, nama suara).
+
+    Menerima "acak", "pria", "wanita", atau nama suara Gemini secara langsung.
+    """
+    gender = gender_of(choice)
+    if gender:
+        return gender, choice
+    if choice in VOICES:
+        return choice, rnd.choice(voice_pool(choice))
+    gender = rnd.choice(list(VOICES))
+    return gender, rnd.choice(voice_pool(gender))
 
 
 def _check(out: Path) -> None:

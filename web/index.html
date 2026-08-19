@@ -33,9 +33,17 @@
         </label>
         <label>Suara narator
           <select id="pVoice">
-            <option value="acak">Acak (disarankan)</option>
-            <option value="pria">Pria (Ardi)</option>
-            <option value="wanita">Wanita (Gadis)</option>
+            <option value="acak">Acak semua suara (disarankan)</option>
+            <optgroup label="Acak dalam satu jenis">
+              <option value="pria">Pria - Puck atau Alnilam</option>
+              <option value="wanita">Wanita - Zephyr atau Aoede</option>
+            </optgroup>
+            <optgroup label="Kunci satu suara">
+              <option value="Puck">Puck (pria)</option>
+              <option value="Alnilam">Alnilam (pria)</option>
+              <option value="Zephyr">Zephyr (wanita)</option>
+              <option value="Aoede">Aoede (wanita)</option>
+            </optgroup>
           </select>
         </label>
       </div>
@@ -43,8 +51,10 @@
         <input id="pHookCard" type="checkbox" checked>
         <span>Kartu hook di awal (teks besar penahan scroll)</span>
       </label>
-      <p class="hint small">Gaya hook dan tata letak dipilih acak tiap video supaya
-        deretan postingan tidak terlihat seragam. Pilihannya dicatat di riwayat.</p>
+      <p class="hint small">Gaya hook, tata letak, dan gaya bicara dipilih acak tiap
+        video supaya deretan postingan tidak terlihat seragam. Kombinasinya dicatat
+        di riwayat. Suara memakai Gemini TTS; kalau kuotanya habis, narasi otomatis
+        memakai suara cadangan dan riwayat akan menandainya.</p>
       <button type="submit">Buat video</button>
       <div class="error" data-err="product"></div>
     </form>

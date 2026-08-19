@@ -296,10 +296,7 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     rnd = random.Random(job_id)
     layout = params.get("layout") or rnd.choice(LAYOUTS)
     hook_style = params.get("hook_style") or rnd.choice(list(gemini.HOOK_STYLES))
-    gender = params.get("voice") or "acak"
-    if gender not in tts.VOICES:
-        gender = rnd.choice(list(tts.VOICES))
-    voice_name = rnd.choice(tts.voice_pool(gender))
+    gender, voice_name = tts.resolve(params.get("voice") or "acak", rnd)
     speech_style = params.get("speech_style") or rnd.choice(list(tts.STYLES))
     rate = rnd.choice(TTS_RATES)
 
