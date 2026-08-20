@@ -91,6 +91,26 @@ $("jobs").addEventListener("click", async (e) => {
   await fetch(`/api/jobs/${id}`, { method: "DELETE" });
 });
 
+/* --------------------------------------------------- petunjuk TikTok Shop */
+
+// TikTok Shop tidak menyediakan deskripsi produk sama sekali, jadi naskah hanya
+// bisa bersandar pada nama produknya. Mengisi deskripsi sendiri menaikkan
+// kualitas naskah secara mencolok - itu diberitahukan tepat saat linknya
+// ditempel, bukan disembunyikan di dokumentasi.
+function cekPetunjukTiktok() {
+  const url = $("pUrl").value.toLowerCase();
+  const tiktok = /vt\.tokopedia\.com|shop-id\.tokopedia\.com|shop\.tiktok\.com|vt\.tiktok\.com/.test(url);
+  const el = $("petunjukTiktok");
+  el.hidden = !tiktok;
+  if (tiktok) {
+    el.innerHTML = "TikTok Shop tidak memberi deskripsi produk, jadi naskah hanya "
+      + "bersandar pada nama produknya. Isi <b>Harga</b> dan <b>Deskripsi sendiri</b> "
+      + "di Opsi lanjutan supaya hasilnya jauh lebih tepat sasaran.";
+  }
+}
+
+$("pUrl").addEventListener("input", cekPetunjukTiktok);
+
 /* ------------------------------------------------------- pasang aplikasi */
 
 let PROMPT_PASANG = null;
@@ -134,6 +154,7 @@ window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   PROMPT_PASANG = e;
   tampilkanAjakanPasang();
+cekPetunjukTiktok();
 });
 
 document.addEventListener("click", async (e) => {
@@ -415,6 +436,7 @@ if ("serviceWorker" in navigator) {
 }
 
 tampilkanAjakanPasang();
+cekPetunjukTiktok();
 checkHealth();
 refreshModels();
 refreshUsage();

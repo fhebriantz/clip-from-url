@@ -49,12 +49,21 @@ def cost(model: str, in_tokens: int, out_tokens: int) -> float:
 
 def record(kind: str, model: str, in_tokens: int, out_tokens: int,
            ok: bool = True, note: str = "") -> None:
-    db.add_usage(
-        kind=kind, model=model, in_tokens=int(in_tokens or 0),
-        out_tokens=int(out_tokens or 0),
-        cost_usd=cost(model, in_tokens or 0, out_tokens or 0) if ok else 0.0,
-        ok=ok, note=note[:200],
-    )
+    """Catat satu panggilan API.
+
+    Kegagalan mencatat tidak boleh pernah menjatuhkan pekerjaan yang sedang
+    dicatat. Pernah terjadi: pencatatan gagal saat menangani galat 503, lalu
+    galatnya tertimpa sehingga rantai coba-ulang ikut patah.
+    """
+    try:
+        db.add_usage(
+            kind=kind, model=model, in_tokens=int(in_tokens or 0),
+            out_tokens=int(out_tokens or 0),
+            cost_usd=cost(model, in_tokens or 0, out_tokens or 0) if ok else 0.0,
+            ok=ok, note=note[:200],
+        )
+    except Exception as exc:  # noqa: BLE001 - telemetri tidak boleh mengganggu
+        print(f"[usage] gagal mencatat pemakaian: {exc}", flush=True)
 
 
 def _today() -> str:

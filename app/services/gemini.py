@@ -166,7 +166,27 @@ Buat TEPAT {scenes} scene. Aturan:
 - Scene terakhir berisi ajakan cek link di bio atau keranjang kuning.
 - post_caption dan hashtags untuk diposting bersama videonya. Hashtag tanpa tanda pagar.
 
-Kalau deskripsi produk minim, fokus ke manfaat yang jelas dari nama produknya. Jangan mengarang klaim spesifik seperti garansi, sertifikasi, atau bahan yang tidak disebutkan."""
+{aturan_deskripsi}"""
+
+# Dipakai saat deskripsi produk benar-benar kosong - sering terjadi pada TikTok
+# Shop, yang tidak menyediakan deskripsi sama sekali. Tanpa aturan setegas ini,
+# model mengisi kekosongan dengan basa-basi umum yang tidak nyambung ke produknya.
+_TANPA_DESKRIPSI = """PENTING: deskripsi produk tidak tersedia, jadi satu-satunya sumber fakta adalah NAMA PRODUK di atas.
+
+- Bedah nama produknya dan pakai kata-kata di dalamnya sebagai bahan utama.
+  Contoh: dari "Kemeja Pria Slimfit Lapis Furing Premium" kamu boleh membahas
+  potongan slimfit, adanya lapisan furing, dan kesan premium - karena semua itu
+  memang tertulis.
+- DILARANG menyebut apa pun yang tidak ada di nama produk. Jangan mengarang
+  bahan, ukuran, warna, jumlah isi, garansi, sertifikasi, keawetan, kemudahan
+  perawatan, atau klaim kenyamanan yang tidak bisa disimpulkan dari namanya.
+- Jangan memakai kalimat umum yang cocok untuk produk apa saja seperti "praktis
+  dipakai", "kualitas terjamin", atau "cocok untuk semua". Kalimat begitu tidak
+  menjual apa pun.
+- Kalau bahan dari nama produk terasa kurang, lebih baik menggali SATU keunggulan
+  yang tertulis lebih dalam daripada menambah keunggulan karangan."""
+
+_DENGAN_DESKRIPSI = """Kalau deskripsi produk minim, fokus ke manfaat yang jelas dari nama produknya. Jangan mengarang klaim spesifik seperti garansi, sertifikasi, atau bahan yang tidak disebutkan."""
 
 
 def write_product_script(product: dict, scenes: int, duration: int,
@@ -175,7 +195,8 @@ def write_product_script(product: dict, scenes: int, duration: int,
                          model_override: str = "") -> dict:
     """Minta Gemini menulis naskah video promosi dari data produk."""
     client = _client()
-    desc = (product.get("description") or "").strip()[:1500] or "(tidak tersedia)"
+    desc_asli = (product.get("description") or "").strip()
+    desc = desc_asli[:1500] or "(tidak tersedia)"
     vague = str(product.get("price_vague") or "").strip()
     prompt = _SCRIPT_PROMPT.format(
         title=product.get("title") or "-",
@@ -185,6 +206,7 @@ def write_product_script(product: dict, scenes: int, duration: int,
         scenes=scenes,
         duration=duration,
         hook_style=HOOK_STYLES.get(hook_style or "", HOOK_STYLES["keluhan"]),
+        aturan_deskripsi=_DENGAN_DESKRIPSI if desc_asli else _TANPA_DESKRIPSI,
     )
 
     if on_status:

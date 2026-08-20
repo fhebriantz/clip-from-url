@@ -343,3 +343,12 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
   min-height: 38px; padding: 9px 16px; font-size: 13px; border-radius: 9px;
 }
 .pasang .link-btn { padding: 9px 10px; }
+
+.petunjuk {
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--warn) 34%, transparent);
+  border-radius: var(--r-sm); padding: 12px 14px;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+}
+.petunjuk[hidden] { display: none; }
+.petunjuk b { color: var(--warn); }

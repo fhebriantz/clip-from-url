@@ -112,7 +112,17 @@ selama gambar dan judulnya sudah ada.
 - **Shopee** tidak merender harga di sisi server. Harga dicari dari teks deskripsi
   penjual; kalau tidak ketemu, isi kolom Harga manual.
 - **TikTok Shop** wajib memakai **tautan share dari aplikasi** (tombol Bagikan).
-  URL yang diketik manual tidak memuat data produk. Harga selalu manual.
+  URL yang diketik manual tidak memuat data produk. Harga selalu manual, dan
+  **deskripsi produk tidak tersedia sama sekali**.
+
+Karena TikTok Shop tidak memberi deskripsi, naskah hanya bisa bersandar pada nama
+produknya. Aplikasi sudah dibatasi supaya tidak mengarang di luar itu - kalau nama
+produknya "Kemeja Pria Slimfit Lapis Furing Premium", naskah boleh membahas
+potongan slimfit dan lapisan furing, tapi dilarang menyebut bahan, keawetan, atau
+kenyamanan yang tidak tertulis.
+
+Hasil terbaik tetap datang dari mengisi **Deskripsi sendiri**. UI akan mengingatkan
+ini otomatis begitu kamu menempel tautan TikTok Shop.
 
 ## Penyebutan harga sengaja dikaburkan
 
