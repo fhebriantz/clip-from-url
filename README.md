@@ -455,10 +455,15 @@ GEMINI_API_KEY=AIza...
 
 ## Masalah saat membuat video
 
-### `Judul produk tidak terbaca. Halaman kemungkinan diblokir`
+### `Judul produk tidak terbaca - halaman kemungkinan sedang diblokir`
 Marketplace memblokir permintaannya - sering terjadi dan bukan kerusakan aplikasi.
 **Solusi:** isi kolom **Nama produk** dan unggah **aset** sendiri. Dengan begitu
 tautannya tidak dibuka sama sekali.
+
+Sering muncul pada **tautan pendek** seperti `s.shopee.co.id/xxxxx`. Tautan pendek
+memang diikuti otomatis ke alamat aslinya, tapi sebagian produk Shopee memakai
+format alamat `/toko/id/id` yang tidak memuat nama produk - jadi tidak ada sumber
+judul selain halaman yang sedang diblokir itu.
 
 ### `Permintaan ditolak marketplace (HTTP 403)` atau `HTTP 429`
 Terlalu sering mengambil halaman dalam waktu dekat.

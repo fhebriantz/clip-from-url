@@ -21,8 +21,11 @@ import httpx
 from .. import assets
 from ..config import ASSETS_DIR, OUTPUT_DIR, TTS_PROVIDER, WORK_DIR
 from ..services import gemini, tts
+from urllib.parse import urlparse
+
 from ..sources.product import (
-    Product, _HEADERS, extract, parse_price_input, price_vague, title_from_url,
+    Product, _HEADERS, extract, parse_price_input, price_vague, resolve_url,
+    title_from_url,
 )
 from ..tools import ensure_ffmpeg, ffprobe_duration, ffprobe_path, run_ffmpeg
 
@@ -431,6 +434,11 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     custom_desc = str(params.get("description") or "").strip()
     custom_title = str(params.get("title") or "").strip()
 
+    # Tautan pendek diselesaikan lebih dulu: alamat tujuannya kadang memuat nama
+    # produk, dan yang diarsipkan jadi menunjuk halaman sebenarnya.
+    if url and len(urlparse(url).path.strip("/").split("/")) <= 1:
+        url = resolve_url(url)
+
     # Nama produk juga ada di dalam alamatnya sendiri, jadi judul masih bisa
     # didapat walau halamannya diblokir.
     judul_url = title_from_url(url) if url else ""
@@ -484,7 +492,12 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     vague = price_vague(product.price)
     report(12, f"Produk: {product.title[:50]}")
 
+    # Dibuat eksplisit, bukan menumpang efek samping tahap lain: kalau aset
+    # diunggah sendiri DAN narasi suara dimatikan, tidak ada satu pun tahap yang
+    # membuatnya, dan render gagal mencari folder yang belum ada.
     work = WORK_DIR / job_id
+    work.mkdir(parents=True, exist_ok=True)
+
     if asset_ids:
         report(20, f"Memakai {len(asset_ids)} aset unggahan...")
         media = assets.load_many(asset_ids)

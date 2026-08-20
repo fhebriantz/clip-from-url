@@ -78,6 +78,20 @@ def detect_source(url: str) -> str:
     )
 
 
+def resolve_url(url: str) -> str:
+    """Ikuti tautan pendek supaya alamat aslinya diketahui.
+
+    Shopee dan Tokopedia punya tautan pendek (s.shopee.co.id/xxx) yang tidak
+    memuat nama produk. Alamat tujuannya kadang memuat, jadi lebih baik dipakai
+    - sekaligus membuat tautan yang diarsipkan menunjuk ke halaman sebenarnya.
+    """
+    try:
+        with httpx.Client(headers=_HEADERS, follow_redirects=True, timeout=20.0) as c:
+            return str(c.head(url).url) or url
+    except httpx.RequestError:
+        return url
+
+
 def _fetch(url: str) -> str:
     with httpx.Client(headers=_HEADERS, follow_redirects=True, timeout=30.0) as c:
         try:
@@ -167,6 +181,14 @@ def title_from_url(url: str) -> str:
     if re.fullmatch(r"[\d.]+", slug):
         return ""
     kata = [w for w in slug.replace("_", "-").split("-") if w]
+
+    # Tautan pendek seperti s.shopee.co.id/80C1EiOlFq berisi kode acak, bukan
+    # nama produk. Tanpa penjagaan ini kode itu dipakai sebagai judul video.
+    if len(kata) < 2:
+        return ""
+    if not any(len(w) > 2 and w.isalpha() for w in kata):
+        return ""
+
     judul = " ".join(kata).strip()
     return judul[:150] if len(judul) > 3 else ""
 
@@ -316,8 +338,10 @@ def extract(url: str) -> Product:
         product = _shopee(url, html) if source == "shopee" else _tokopedia(url, html)
     if not product.title:
         raise RuntimeError(
-            "Judul produk tidak terbaca. Halaman kemungkinan diblokir atau "
-            "URL-nya bukan halaman detail produk."
+            "Judul produk tidak terbaca - halaman kemungkinan sedang diblokir "
+            "marketplace, dan namanya juga tidak ada di alamatnya. "
+            "Isi kolom Nama produk lalu unggah gambar atau klip sendiri; "
+            "dengan begitu tautannya tidak perlu dibuka sama sekali."
         )
     if not product.images:
         raise RuntimeError("Tidak ada gambar produk yang bisa diambil dari halaman ini.")
