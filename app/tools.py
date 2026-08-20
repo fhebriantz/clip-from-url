@@ -115,6 +115,25 @@ def ensure_ffmpeg(on_progress=None) -> Path:
 
 
 
+def ffprobe_path() -> Path:
+    """Lokasi ffprobe.
+
+    Dicari lewat bin/ dan PATH, bukan ditebak dari folder ffmpeg: di Windows
+    keduanya bisa terpasang di tempat berbeda.
+    """
+    found = find_binary("ffprobe")
+    if found:
+        return found
+    ffmpeg = ensure_ffmpeg()
+    kandidat = ffmpeg.parent / ("ffprobe.exe" if ffmpeg.suffix else "ffprobe")
+    if kandidat.is_file():
+        return kandidat
+    raise RuntimeError(
+        "ffprobe tidak ditemukan. Biasanya satu paket dengan FFmpeg - "
+        "hapus folder bin/ lalu jalankan ulang supaya diunduh otomatis."
+    )
+
+
 def ffprobe_duration(path: Path) -> float:
     """Durasi video dalam detik."""
     ffprobe = find_binary("ffprobe")

@@ -24,7 +24,7 @@ from ..services import gemini, tts
 from ..sources.product import (
     Product, _HEADERS, extract, parse_price_input, price_vague, title_from_url,
 )
-from ..tools import ensure_ffmpeg, ffprobe_duration, run_ffmpeg
+from ..tools import ensure_ffmpeg, ffprobe_duration, ffprobe_path, run_ffmpeg
 
 Report = Callable[[int, str], None]
 
@@ -106,7 +106,7 @@ def _slug(text: str, fallback: str) -> str:
 
 
 def _image_size(path: Path) -> tuple[int, int]:
-    ffprobe = ensure_ffmpeg().parent / ("ffprobe.exe" if ensure_ffmpeg().suffix else "ffprobe")
+    ffprobe = ffprobe_path()
     out = subprocess.run(
         [str(ffprobe), "-v", "error", "-select_streams", "v:0",
          "-show_entries", "stream=width,height", "-of", "csv=p=0", str(path)],

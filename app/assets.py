@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .config import ASSET_KEEP_DAYS, ASSET_ORPHAN_HOURS, DATA_DIR
-from .tools import ensure_ffmpeg, run_ffmpeg
+from .tools import ensure_ffmpeg, ffprobe_path, run_ffmpeg
 
 UPLOAD_DIR = DATA_DIR / "uploads"
 
@@ -51,7 +51,7 @@ class Asset:
 
 
 def _ffprobe(path: Path) -> dict:
-    exe = ensure_ffmpeg().parent / ("ffprobe.exe" if ensure_ffmpeg().suffix else "ffprobe")
+    exe = ffprobe_path()
     out = subprocess.run(
         [str(exe), "-v", "error", "-select_streams", "v:0",
          "-show_entries", "stream=codec_name,width,height",
