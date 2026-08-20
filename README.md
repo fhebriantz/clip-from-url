@@ -70,9 +70,21 @@ gagal saat marketplace sedang memblokir.
 | Yang kamu isi | Tautan dibuka? |
 |---|---|
 | URL saja | ya |
-| URL + nama produk, tanpa aset | ya (butuh gambarnya) |
+| URL + aset, tanpa nama produk | **tidak** kalau namanya bisa dibaca dari alamatnya |
 | URL + nama produk + aset | **tidak** - arsip saja |
 | Tanpa URL, ada nama + aset | tidak ada tautan |
+
+Nama produk juga ditebak dari slug di alamatnya. Shopee dan Tokopedia menaruh nama
+produk di URL, jadi kolom Nama produk biasanya tidak perlu diisi:
+
+```
+.../PROUDYHIJAB-Gyomi-Oversized-Shirt-Blouse-Korean-Atasan-Wanita-...-i.142018453.29210875224
+-> "PROUDYHIJAB Gyomi Oversized Shirt Blouse Korean Atasan Wanita ..."
+```
+
+Kalau halaman tetap harus dibuka tapi diblokir, job **tidak digagalkan** selama
+gambar dan judulnya sudah ada - marketplace rutin memblokir, dan itu bukan alasan
+membatalkan video yang datanya sudah lengkap.
 
 Tanpa URL, nama produk dan minimal satu aset wajib diisi. Kalau tautannya hanya
 arsip, platformnya bebas - boleh Linktree, TikTok affiliate, apa saja.

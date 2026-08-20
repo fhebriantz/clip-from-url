@@ -22,7 +22,7 @@ from .. import assets
 from ..config import ASSETS_DIR, OUTPUT_DIR, TTS_PROVIDER, WORK_DIR
 from ..services import gemini, tts
 from ..sources.product import (
-    Product, _HEADERS, extract, parse_price_input, price_vague,
+    Product, _HEADERS, extract, parse_price_input, price_vague, title_from_url,
 )
 from ..tools import ensure_ffmpeg, ffprobe_duration, run_ffmpeg
 
@@ -409,21 +409,38 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     custom_desc = str(params.get("description") or "").strip()
     custom_title = str(params.get("title") or "").strip()
 
-    # Halaman produk hanya diambil kalau ada yang benar-benar dibutuhkan darinya:
-    # judul atau gambar. Deskripsi dan harga sifatnya pelengkap. Kalau pengguna
-    # sudah menyediakan judul dan asetnya sendiri, tautannya murni arsip - tidak
-    # ada gunanya menembak halaman yang bisa saja diblokir dan menggagalkan job.
-    perlu_ambil = bool(url) and (not custom_title or not asset_ids)
+    # Nama produk juga ada di dalam alamatnya sendiri, jadi judul masih bisa
+    # didapat walau halamannya diblokir.
+    judul_url = title_from_url(url) if url else ""
+    judul_siap = custom_title or judul_url
 
+    # Halaman hanya dibuka kalau ada yang benar-benar dibutuhkan darinya: judul
+    # atau gambar. Deskripsi dan harga sifatnya pelengkap. Kalau judul dan aset
+    # sudah ada, tautannya murni arsip - tidak ada gunanya menembak halaman yang
+    # bisa saja diblokir dan menggagalkan job.
+    perlu_ambil = bool(url) and (not judul_siap or not asset_ids)
+
+    product: Product | None = None
     if perlu_ambil:
         report(5, "Membaca halaman produk...")
-        product = extract(url)
+        try:
+            product = extract(url)
+        except Exception as exc:  # noqa: BLE001 - masih mungkin lanjut tanpa halaman
+            # Marketplace rutin memblokir permintaan. Selama gambar dan judulnya
+            # sudah ada, itu bukan alasan untuk menggagalkan video.
+            if not (asset_ids and judul_siap):
+                raise
+            report(8, f"Halaman diblokir, pakai data yang ada ({str(exc)[:60]})")
     else:
         report(5, "Memakai data yang kamu isi sendiri...")
+
+    if product is None:
         product = Product(url=url, source="manual")
 
     if custom_title:
         product.title = custom_title
+    elif not product.title and judul_url:
+        product.title = judul_url
     if custom_desc:
         # Deskripsi tulisan pengguna selalu menang atas hasil scraping: itu yang
         # dia tahu tentang produknya, bukan tebakan dari halaman.

@@ -149,6 +149,28 @@ def price_vague(value: int | None) -> str:
     return f"{value // 1_000} ribuan"
 
 
+def title_from_url(url: str) -> str:
+    """Tebak nama produk dari slug di URL.
+
+    Shopee dan Tokopedia menaruh nama produk di alamatnya, jadi judul masih bisa
+    didapat walau halamannya diblokir. Jauh lebih baik daripada menggagalkan job
+    hanya karena judul tidak terbaca, apalagi kalau gambarnya sudah diunggah.
+    """
+    path = urlparse(url).path.strip("/")
+    if not path:
+        return ""
+    slug = path.split("/")[-1]
+    # Shopee: "Nama-Produk-i.<shopid>.<itemid>"
+    slug = re.sub(r"-i\.\d+\.\d+$", "", slug)
+    # Tokopedia sering menempelkan id panjang di ujung slug.
+    slug = re.sub(r"-\d{10,}$", "", slug)
+    if re.fullmatch(r"[\d.]+", slug):
+        return ""
+    kata = [w for w in slug.replace("_", "-").split("-") if w]
+    judul = " ".join(kata).strip()
+    return judul[:150] if len(judul) > 3 else ""
+
+
 def parse_price_input(text: str) -> tuple[str, int | None]:
     """Baca harga yang diketik pengguna. Menerima "599000" maupun "Rp599.000"."""
     text = text.strip()
