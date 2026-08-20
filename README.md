@@ -60,7 +60,10 @@ Menjalankan ulang setelah itu hanya butuh beberapa detik.
 3. Tunggu 30-90 detik
 4. Video muncul di daftar Riwayat, bisa diputar dan diunduh
 
-Hasilnya tersimpan di `data/output/<id-job>/`.
+Hasilnya tersimpan di `data/output/<id-job>/`, berisi dua berkas:
+
+- `<nama-produk>.mp4` - videonya
+- `<nama-produk>.txt` - caption dan hashtag, siap salin
 
 ## Semua kolom di UI
 
@@ -134,6 +137,45 @@ Tiap video mengacak empat hal supaya deretan postingan tidak terlihat seragam:
 
 Kombinasinya dicatat di Riwayat, jadi kamu bisa melihat gaya mana yang performanya
 bagus.
+
+## Sinkron otomatis ke HP lewat Google Drive
+
+Supaya video dan captionnya langsung sampai ke HP tanpa dipindahkan manual,
+arahkan folder keluaran ke folder yang disinkronkan.
+
+**Windows** - pasang [Google Drive for desktop](https://www.google.com/drive/download/),
+lalu isi di `.env`:
+
+```
+OUTPUT_DIR=G:\My Drive\clip-from-url
+```
+
+Ganti `G:` dengan huruf drive yang dipakai Google Drive di komputermu. Cara yang
+sama berlaku untuk OneDrive (`C:\Users\<nama>\OneDrive\clip-from-url`) atau
+Dropbox.
+
+**Linux/macOS:**
+
+```
+OUTPUT_DIR=~/GoogleDrive/clip-from-url
+```
+
+Setelah itu tiap video jadi akan muncul sendiri di aplikasi Drive di HP, lengkap
+dengan berkas caption `.txt`-nya. Tinggal buka TikTok, pilih videonya dari galeri,
+lalu tempel captionnya.
+
+Kalau dikosongkan, hasilnya tetap di `data/output/` seperti biasa.
+
+### Kenapa tidak langsung diunggah ke draft TikTok
+
+TikTok **tidak menyediakan API yang menerima username dan password** - satu-satunya
+cara resmi adalah OAuth lewat aplikasi developer terdaftar. Mengotomasi login lewat
+browser bot melanggar ketentuan TikTok dan berisiko akun diblokir.
+
+Jalur resminya ada (`/v2/post/publish/inbox/video/init/` dengan scope
+`video.upload`, videonya masuk sebagai draft), tapi dibatasi **maksimal 5 draft
+tertunda per 24 jam** - di bawah kebutuhan harian kalau kamu memposting lebih dari
+itu. Folder tersinkron tidak punya batas semacam itu.
 
 ## Musik latar sengaja tidak ada
 

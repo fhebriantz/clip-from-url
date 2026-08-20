@@ -565,6 +565,14 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
 
     total = ffprobe_duration(out_dir / filename)
     tags = " ".join(f"#{h}" for h in script["hashtags"])
+
+    # Caption ditulis sebagai berkas di sebelah videonya. Kalau folder keluaran
+    # diarahkan ke Google Drive atau OneDrive, caption ikut sampai ke HP - jadi
+    # tidak perlu menyalinnya dari layar komputer.
+    caption_file = out_dir / f"{Path(filename).stem}.txt"
+    caption_file.write_text(
+        f"{script['post_caption']}\n\n{tags}\n", encoding="utf-8"
+    )
     add_clip(
         filename=filename,
         start_s=0.0,

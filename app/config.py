@@ -13,7 +13,9 @@ load_dotenv(ROOT / ".env")
 BIN_DIR = ROOT / "bin"
 DATA_DIR = ROOT / "data"
 WORK_DIR = DATA_DIR / "work"
-OUTPUT_DIR = DATA_DIR / "output"
+# Bisa diarahkan ke folder yang tersinkron ke HP (Google Drive, OneDrive, Dropbox)
+# supaya video dan captionnya langsung sampai tanpa perlu memindahkan manual.
+OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "").strip() or DATA_DIR / "output").expanduser()
 WEB_DIR = ROOT / "web"
 ASSETS_DIR = ROOT / "assets"
 DB_PATH = DATA_DIR / "app.db"
