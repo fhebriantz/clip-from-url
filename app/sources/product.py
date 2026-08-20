@@ -78,6 +78,60 @@ def detect_source(url: str) -> str:
     )
 
 
+def _host_privat(host: str) -> bool:
+    """Host lokal atau jaringan privat, tidak boleh dihubungi.
+
+    Aplikasi ini mengambil URL yang diketik pengguna, dan sejak bisa dibuka dari
+    HP lewat jaringan, URL itu bisa datang dari perangkat lain. Tanpa penjagaan
+    ini seseorang bisa memakainya untuk menembak alamat internal jaringanmu.
+    """
+    h = (host or "").lower().strip("[]")
+    if h in ("localhost", "::1") or h.endswith((".local", ".internal")):
+        return True
+    m = re.fullmatch(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", h)
+    if not m:
+        return False
+    a, b = int(m.group(1)), int(m.group(2))
+    return (
+        a in (0, 10, 127)
+        or (a == 192 and b == 168)
+        or (a == 169 and b == 254)
+        or (a == 172 and 16 <= b <= 31)
+    )
+
+
+def shopee_key(url: str) -> str:
+    """Ambil "{shop_id}/{item_id}" dari berbagai bentuk tautan produk Shopee.
+
+    Shopee memakai beberapa format untuk produk yang sama:
+      /product/{shop}/{item}          - format kanonik
+      /{namatoko}/{shop}/{item}       - format aplikasi HP
+      /Nama-Produk-i.{shop}.{item}    - format slug
+
+    Intinya mengambil dua ruas angka berurutan terakhir pada path. Diadaptasi
+    dari helper yang sudah dipakai di proyek affiliate.
+    """
+    path = url.split("#")[0].split("?")[0]
+    m = re.search(r"-i\.(\d+)\.(\d+)", path, re.I)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}"
+    ruas = [x for x in path.split("/") if x]
+    for i in range(len(ruas) - 1, 0, -1):
+        if re.fullmatch(r"\d{4,}", ruas[i]) and re.fullmatch(r"\d{4,}", ruas[i - 1]):
+            return f"{ruas[i - 1]}/{ruas[i]}"
+    return ""
+
+
+def canonical_shopee(url: str) -> str:
+    """Bentuk /product/{shop}/{item}, atau string kosong kalau tidak terbaca.
+
+    Bukan sekadar kerapian: format kanonik ini terbukti dilayani penuh oleh
+    Shopee, sedangkan format aplikasi HP dan format slug rutin dijawab captcha.
+    """
+    kunci = shopee_key(url)
+    return f"https://shopee.co.id/product/{kunci}" if kunci else ""
+
+
 def resolve_url(url: str) -> str:
     """Ikuti tautan pendek supaya alamat aslinya diketahui.
 
@@ -85,6 +139,8 @@ def resolve_url(url: str) -> str:
     memuat nama produk. Alamat tujuannya kadang memuat, jadi lebih baik dipakai
     - sekaligus membuat tautan yang diarsipkan menunjuk ke halaman sebenarnya.
     """
+    if _host_privat(urlparse(url).hostname or ""):
+        return url
     try:
         with httpx.Client(headers=_HEADERS, follow_redirects=True, timeout=20.0) as c:
             return str(c.head(url).url) or url
@@ -93,6 +149,8 @@ def resolve_url(url: str) -> str:
 
 
 def _fetch(url: str) -> str:
+    if _host_privat(urlparse(url).hostname or ""):
+        raise RuntimeError("Alamat ini menunjuk ke jaringan lokal, tidak dibuka.")
     with httpx.Client(headers=_HEADERS, follow_redirects=True, timeout=30.0) as c:
         try:
             r = c.get(url)
@@ -334,7 +392,15 @@ def extract(url: str) -> Product:
     if source == "tiktok":
         product = _tiktok(url)
     else:
-        html = _fetch(url)
+        alamat = url
+        if source == "shopee":
+            # Tautan pendek belum memuat id produk, jadi diselesaikan dulu.
+            if not shopee_key(alamat):
+                alamat = resolve_url(alamat)
+            # Lalu dinormalkan: format kanonik dilayani penuh, sementara format
+            # aplikasi HP dan format slug rutin dijawab captcha.
+            alamat = canonical_shopee(alamat) or alamat
+        html = _fetch(alamat)
         product = _shopee(url, html) if source == "shopee" else _tokopedia(url, html)
     if not product.title:
         raise RuntimeError(

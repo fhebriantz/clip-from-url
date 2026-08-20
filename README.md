@@ -111,6 +111,25 @@ selama gambar dan judulnya sudah ada.
 
 - **Shopee** tidak merender harga di sisi server. Harga dicari dari teks deskripsi
   penjual; kalau tidak ketemu, isi kolom Harga manual.
+
+### Alamat Shopee dinormalkan dulu
+
+Shopee memakai beberapa bentuk alamat untuk produk yang sama, dan **hanya bentuk
+kanonik yang dilayani penuh**:
+
+| Bentuk | Hasil |
+|---|---|
+| `/product/{shop}/{item}` | halaman lengkap, judul terbaca |
+| `/{namatoko}/{shop}/{item}` (dari aplikasi HP) | dijawab captcha |
+| `/Nama-Produk-i.{shop}.{item}` (slug) | dijawab captcha |
+| `s.shopee.co.id/xxxxx` (tautan pendek) | perlu diselesaikan dulu |
+
+Karena itu tautan pendek diikuti ke alamat aslinya, lalu id toko dan id produknya
+diambil dan disusun ulang jadi bentuk kanonik sebelum halaman dibuka. Tautan yang
+kamu tempel tetap disimpan apa adanya sebagai arsip.
+
+Logika pembacaan id produknya diadaptasi dari helper yang sudah dipakai di proyek
+`affiliate` milik penulis.
 - **TikTok Shop** wajib memakai **tautan share dari aplikasi** (tombol Bagikan).
   URL yang diketik manual tidak memuat data produk. Harga selalu manual, dan
   **deskripsi produk tidak tersedia sama sekali**.
@@ -460,10 +479,9 @@ Marketplace memblokir permintaannya - sering terjadi dan bukan kerusakan aplikas
 **Solusi:** isi kolom **Nama produk** dan unggah **aset** sendiri. Dengan begitu
 tautannya tidak dibuka sama sekali.
 
-Sering muncul pada **tautan pendek** seperti `s.shopee.co.id/xxxxx`. Tautan pendek
-memang diikuti otomatis ke alamat aslinya, tapi sebagian produk Shopee memakai
-format alamat `/toko/id/id` yang tidak memuat nama produk - jadi tidak ada sumber
-judul selain halaman yang sedang diblokir itu.
+Untuk Shopee, alamatnya dinormalkan dulu ke bentuk kanonik yang jarang diblokir,
+jadi galat ini kini lebih jarang muncul. Kalau tetap terjadi, isi Nama produk dan
+unggah asetmu sendiri.
 
 ### `Permintaan ditolak marketplace (HTTP 403)` atau `HTTP 429`
 Terlalu sering mengambil halaman dalam waktu dekat.
