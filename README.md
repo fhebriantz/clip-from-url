@@ -147,12 +147,25 @@ arahkan folder keluaran ke folder yang disinkronkan.
 lalu isi di `.env`:
 
 ```
-OUTPUT_DIR=G:\My Drive\clip-from-url
+OUTPUT_DIR=G:\My Drive\Affiliate\video
 ```
 
-Ganti `G:` dengan huruf drive yang dipakai Google Drive di komputermu. Cara yang
-sama berlaku untuk OneDrive (`C:\Users\<nama>\OneDrive\clip-from-url`) atau
-Dropbox.
+Ganti `G:` dengan huruf drive yang dipakai Google Drive di komputermu, dan sesuaikan
+nama foldernya. Foldernya dibuat otomatis kalau belum ada. Cara yang sama berlaku
+untuk OneDrive (`C:\Users\<nama>\OneDrive\Affiliate\video`) atau Dropbox.
+
+**Jangan memakai tanda kutip ganda.** Backslash di dalam kutip ganda diterjemahkan
+sebagai kode khusus, dan kesalahannya tidak memunculkan pesan apa pun - aplikasi
+hanya membuat folder dengan nama aneh yang tidak ikut tersinkron:
+
+| | |
+|---|---|
+| BENAR | `OUTPUT_DIR=G:\My Drive\Affiliate\video` |
+| BENAR | `OUTPUT_DIR=G:/My Drive/Affiliate/video` |
+| SALAH | `OUTPUT_DIR="G:\My Drive\Affiliate\video"` |
+
+Campuran `\` dan `/` juga diterima Windows, jadi
+`G:\My Drive\Affiliate/video` tetap bekerja.
 
 **Linux/macOS:**
 
