@@ -41,6 +41,12 @@ TIKTOK_HOSTS = (
     "vm.tiktok.com",
 )
 
+# Domain tautan pendek resmi. Tanpa daftar ini, tautan yang dibagikan dari
+# aplikasi HP ditolak mentah padahal sah - dan itu justru bentuk yang paling
+# sering dipakai orang.
+SHOPEE_HOSTS = ("shopee.co.id", "shopee.com", "shopee.sg", "shope.ee")
+TOKOPEDIA_HOSTS = ("tokopedia.com", "tokopedia.link")
+
 
 @dataclass
 class Product:
@@ -63,18 +69,24 @@ class UnsupportedURL(ValueError):
     pass
 
 
+def _cocok(host: str, daftar: tuple[str, ...]) -> bool:
+    return any(host == h or host.endswith("." + h) for h in daftar)
+
+
 def detect_source(url: str) -> str:
     host = (urlparse(url).hostname or "").lower()
-    # TikTok Shop dicek lebih dulu: host-nya ikut mengandung "tokopedia.com".
-    if any(host == h or host.endswith("." + h) for h in TIKTOK_HOSTS):
+    # TikTok Shop dicek lebih dulu: sebagian host-nya ikut berakhiran
+    # "tokopedia.com" sehingga akan tertangkap aturan Tokopedia.
+    if _cocok(host, TIKTOK_HOSTS):
         return "tiktok"
-    if "shopee." in host:
+    if _cocok(host, SHOPEE_HOSTS):
         return "shopee"
-    if host.endswith("tokopedia.com"):
+    if _cocok(host, TOKOPEDIA_HOSTS):
         return "tokopedia"
     raise UnsupportedURL(
-        "URL harus dari shopee.co.id, tokopedia.com, atau TikTok Shop. "
-        "Platform lain belum didukung."
+        "URL harus dari Shopee, Tokopedia, atau TikTok Shop "
+        "(termasuk tautan pendek seperti s.shopee.co.id, shope.ee, "
+        "tokopedia.link, atau vt.tokopedia.com). Platform lain belum didukung."
     )
 
 

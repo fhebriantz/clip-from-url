@@ -130,6 +130,23 @@ kamu tempel tetap disimpan apa adanya sebagai arsip.
 
 Logika pembacaan id produknya diadaptasi dari helper yang sudah dipakai di proyek
 `affiliate` milik penulis.
+
+### Tokopedia dan TikTok Shop tidak bisa dinormalkan seperti itu
+
+Sudah diuji, hasilnya berbeda:
+
+| Platform | Bentuk kanonik | Kesimpulan |
+|---|---|---|
+| Shopee | `/product/{shop}/{item}` bekerja | dinormalkan |
+| Tokopedia | `/product/{id}` dan `/p/{id}` dua-duanya gagal | bentuk `toko/slug-id` memang sudah yang benar |
+| TikTok Shop | semua bentuk dijawab captcha | tidak ada yang bisa dinormalkan |
+
+Untuk TikTok Shop, normalisasi justru **merugikan**: data produknya ada di
+parameter `og_info` pada tautan share, jadi membersihkan query akan menghapus
+satu-satunya sumber data yang ada.
+
+Domain tautan pendek yang dikenali: `s.shopee.co.id`, `shope.ee`, `tokopedia.link`,
+`vt.tokopedia.com`, `vt.tiktok.com`, `vm.tiktok.com`.
 - **TikTok Shop** wajib memakai **tautan share dari aplikasi** (tombol Bagikan).
   URL yang diketik manual tidak memuat data produk. Harga selalu manual, dan
   **deskripsi produk tidak tersedia sama sekali**.
