@@ -2,7 +2,8 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
 <title>clip-from-url</title>
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -14,86 +15,88 @@
 
 <main>
   <section class="card">
-    <h2>URL produk jadi video</h2>
-    <p class="hint">Tempel URL produk Shopee, Tokopedia, atau tautan share TikTok Shop -
-      gambar dan deskripsinya diambil otomatis. Atau isi sendiri nama produk, aset, dan
-      deskripsinya; halaman produk cuma dibuka kalau memang ada yang dibutuhkan dari sana.</p>
-
     <form id="formProduct">
-      <label>URL produk <span class="opt">(opsional kalau Nama produk dan aset diisi sendiri - dipakai sebagai arsip saja)</span>
-        <input id="pUrl" type="url"
-               placeholder="Shopee, Tokopedia, atau tautan share TikTok Shop">
+
+      <label>URL produk
+        <input id="pUrl" type="url" inputmode="url" autocomplete="off"
+               placeholder="Tempel link Shopee, Tokopedia, atau TikTok Shop">
       </label>
-      <label>Nama produk <span class="opt">(opsional - kalau diisi, judul tidak diambil dari halaman)</span>
-        <input id="pTitle" type="text" placeholder="Gyomi Oversized Shirt Blouse Atasan Wanita">
-      </label>
-      <label>Harga <span class="opt">(opsional - isi kalau tidak terbaca otomatis, wajib untuk TikTok Shop)</span>
-        <input id="pPrice" type="text" placeholder="599000">
-      </label>
-      <div class="row">
-        <label>Target durasi (detik)
-          <input id="pDuration" type="number" value="30" min="15" max="60">
-        </label>
-        <label>Suara narator
-          <select id="pVoice">
-            <option value="acak">Acak semua suara (disarankan)</option>
-            <optgroup label="Acak dalam satu jenis">
-              <option value="pria">Pria - Puck atau Alnilam</option>
-              <option value="wanita">Wanita - Zephyr atau Aoede</option>
-            </optgroup>
-            <optgroup label="Kunci satu suara">
-              <option value="Puck">Puck (pria)</option>
-              <option value="Alnilam">Alnilam (pria)</option>
-              <option value="Zephyr">Zephyr (wanita)</option>
-              <option value="Aoede">Aoede (wanita)</option>
-            </optgroup>
-          </select>
-        </label>
-      </div>
-      <label>Aset sendiri <span class="opt">(opsional - gambar atau klip video. Kalau diisi, gambar tidak diambil dari halaman produk)</span>
+
+      <label>Aset sendiri <span class="opt">gambar atau klip video</span>
         <input id="pFiles" type="file" accept="image/*,video/*" multiple>
       </label>
       <div id="assetList" class="assets"></div>
 
-      <label>Deskripsi sendiri <span class="opt">(opsional - kalau diisi, menggantikan deskripsi dari halaman produk)</span>
-        <textarea id="pDesc" rows="3" placeholder="Tulis apa yang kamu tahu soal produknya. Gemini yang akan menyusunnya jadi naskah."></textarea>
+      <label>Harga <span class="opt">wajib untuk TikTok Shop</span>
+        <input id="pPrice" type="text" inputmode="numeric" placeholder="59000">
       </label>
 
-      <div class="row">
-        <label>Model naskah
-          <select id="pScriptModel"></select>
-        </label>
-        <label>Model suara
-          <select id="pTtsModel"></select>
-        </label>
-      </div>
-
-      <label class="check">
-        <input id="pHookCard" type="checkbox" checked>
-        <span>Kartu hook di awal (teks besar penahan scroll)</span>
-      </label>
-      <label class="check">
-        <input id="pNarration" type="checkbox" checked>
-        <span>Pakai suara narasi. Matikan untuk hemat kuota TTS - naskahnya
-          tetap ditulis di berkas .txt buat dipakai di TTS TikTok</span>
-      </label>
-      <p class="hint small">Gaya hook, tata letak, dan gaya bicara dipilih acak tiap
-        video supaya deretan postingan tidak terlihat seragam. Kombinasinya dicatat
-        di riwayat. Suara memakai Gemini TTS; kalau kuotanya habis, narasi otomatis
-        memakai suara cadangan dan riwayat akan menandainya.</p>
       <button type="submit">Buat video</button>
       <div class="error" data-err="product"></div>
+
+      <details class="lanjutan">
+        <summary>Opsi lanjutan</summary>
+
+        <label>Nama produk <span class="opt">biasanya terbaca sendiri dari link</span>
+          <input id="pTitle" type="text" placeholder="Kemeja Oversized Motif Salur">
+        </label>
+
+        <label>Deskripsi sendiri <span class="opt">menggantikan deskripsi dari halaman</span>
+          <textarea id="pDesc" rows="3"
+                    placeholder="Tulis apa yang kamu tahu soal produknya."></textarea>
+        </label>
+
+        <div class="row">
+          <label>Durasi (detik)
+            <input id="pDuration" type="number" inputmode="numeric" value="30" min="15" max="60">
+          </label>
+          <label>Suara narator
+            <select id="pVoice">
+              <option value="acak">Acak semua suara</option>
+              <optgroup label="Acak dalam satu jenis">
+                <option value="pria">Pria - Puck atau Alnilam</option>
+                <option value="wanita">Wanita - Zephyr atau Aoede</option>
+              </optgroup>
+              <optgroup label="Kunci satu suara">
+                <option value="Puck">Puck (pria)</option>
+                <option value="Alnilam">Alnilam (pria)</option>
+                <option value="Zephyr">Zephyr (wanita)</option>
+                <option value="Aoede">Aoede (wanita)</option>
+              </optgroup>
+            </select>
+          </label>
+        </div>
+
+        <div class="row">
+          <label>Model naskah
+            <select id="pScriptModel"></select>
+          </label>
+          <label>Model suara
+            <select id="pTtsModel"></select>
+          </label>
+        </div>
+
+        <label class="check">
+          <input id="pHookCard" type="checkbox" checked>
+          <span>Kartu hook di awal</span>
+        </label>
+        <label class="check">
+          <input id="pNarration" type="checkbox" checked>
+          <span>Pakai suara narasi <em>matikan untuk hemat kuota; naskahnya
+            tetap ditulis di berkas .txt</em></span>
+        </label>
+      </details>
     </form>
+  </section>
+
+  <section>
+    <h2 class="section-title">Riwayat</h2>
+    <div id="jobs" class="jobs"><p class="empty">Belum ada video.</p></div>
   </section>
 
   <section>
     <h2 class="section-title">Pemakaian API hari ini</h2>
     <div id="usage" class="card usage"><p class="empty">Memuat...</p></div>
-  </section>
-
-  <section>
-    <h2 class="section-title">Riwayat</h2>
-    <div id="jobs" class="jobs"><p class="empty">Belum ada job.</p></div>
   </section>
 </main>
 

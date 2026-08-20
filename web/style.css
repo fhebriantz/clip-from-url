@@ -67,14 +67,17 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color:
 .row { display: flex; gap: 14px; }
 .row label { flex: 1; }
 
-input[type=url], input[type=number] {
+/* 16px mencegah iOS memperbesar halaman otomatis saat kolom disentuh. */
+input[type=url], input[type=number], input[type=text], textarea, select, input[type=file] {
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font: inherit;
+  border-radius: 10px;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 16px;
   width: 100%;
+  min-height: 46px;
 }
 input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
@@ -83,8 +86,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 button {
   background: var(--accent); color: #fff; border: 0;
-  border-radius: 8px; padding: 11px 18px;
-  font: 600 14px/1 inherit; cursor: pointer;
+  border-radius: 10px; padding: 15px 18px;
+  font: 600 16px/1 inherit; cursor: pointer;
+  min-height: 50px;
 }
 button:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -199,3 +203,46 @@ textarea {
 .use-disk-label { color: var(--muted); }
 
 .opt-habis { color: var(--err); }
+
+/* ---------------------------------------------------------- opsi lanjutan */
+
+.lanjutan {
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 0 14px; background: var(--surface-2);
+}
+.lanjutan > summary {
+  cursor: pointer; padding: 14px 0; font-size: 14px; font-weight: 600;
+  list-style: none; user-select: none;
+}
+.lanjutan > summary::-webkit-details-marker { display: none; }
+.lanjutan > summary::before { content: "+ "; color: var(--accent); font-weight: 700; }
+.lanjutan[open] > summary::before { content: "- "; }
+.lanjutan[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.lanjutan > *:last-child { margin-bottom: 14px; }
+.lanjutan .row, .lanjutan > label { margin-bottom: 14px; }
+.check span em { display: block; font-style: normal; color: var(--muted); font-size: 12px; }
+
+/* ------------------------------------------------------------- layar kecil */
+
+@media (max-width: 640px) {
+  header { padding: 14px 16px; flex-direction: column; align-items: flex-start; gap: 6px; }
+  main { padding: 16px 14px 40px; }
+  .card { padding: 16px 14px; }
+
+  /* Dua kolom bersebelahan terlalu sempit di HP. */
+  .row { flex-direction: column; gap: 14px; }
+
+  /* Pratinjau trim ditumpuk supaya frame-nya cukup besar untuk dilihat. */
+  .trim { flex-direction: column; }
+  .trim-frames { width: 100%; justify-content: space-between; }
+  .trim-frames figure { width: 48%; }
+  .trim-frames img { width: 100%; height: auto; aspect-ratio: 4 / 3; }
+  .trim-ctl input[type=range] { min-height: 40px; }
+
+  .clips { grid-template-columns: 1fr; }
+  .asset img, .asset video { width: 64px; height: 86px; }
+  .job-head { flex-direction: column; gap: 8px; }
+  .badges { align-self: flex-start; }
+  .use-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .link-btn { min-height: 40px; }
+}

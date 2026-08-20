@@ -68,6 +68,10 @@ Hasilnya tersimpan di `data/output/<id-job>/`, berisi dua berkas:
 
 ## Semua kolom di UI
 
+Yang tampil langsung hanya tiga: **URL produk**, **Aset sendiri**, dan **Harga**.
+Sisanya disembunyikan di bagian **Opsi lanjutan** yang bisa dibuka - dirancang
+supaya nyaman dipakai dari layar HP.
+
 | Kolom | Wajib? | Keterangan |
 |---|---|---|
 | **URL produk** | tidak, kalau Nama produk dan aset diisi | Shopee, Tokopedia, atau tautan share TikTok Shop |
@@ -454,7 +458,11 @@ Tahap yang paling lama biasanya menunggu API Gemini, bukan komputer lambat.
 
 ## Reset total
 
-Kalau semuanya kacau dan ingin mulai bersih:
+**Hentikan dulu aplikasinya** (tekan Ctrl+C atau tutup jendelanya). Menghapus
+`data\app.db` saat aplikasi masih jalan menyebabkan galat
+`attempt to write a readonly database` pada job berikutnya.
+
+Setelah berhenti:
 
 1. Hapus folder `.venv` (dependency Python)
 2. Hapus folder `bin` (FFmpeg)
