@@ -343,14 +343,20 @@ Video hasil ada di `data\output\` dan aman kalau ingin dipertahankan.
   `app/sources/product.py` (ambil data produk), `web/` (UI).
 - Konfigurasi ada di `.env`; contoh lengkapnya di `.env.example`.
 
-# 6. Struktur folder
+# 6. Lisensi
+
+Kode aplikasi ini milik penulisnya. Font **Montserrat** yang dibundel di
+`assets/fonts/` berlisensi **SIL Open Font License 1.1** - teks lisensinya ada di
+`assets/fonts/OFL.txt` dan wajib ikut disertakan kalau kamu mendistribusikan ulang.
+
+# 7. Struktur folder
 
 ```
 run.bat / run.sh   pintu masuk
 .env               konfigurasi (API key) - jangan dibagikan
 app/               kode aplikasi
 web/               UI (HTML/CSS/JS, tanpa build step)
-assets/fonts/      font subtitle
+assets/fonts/      font subtitle + lisensinya
 bin/               FFmpeg hasil unduhan otomatis
 data/output/       video jadi
 data/uploads/      aset yang kamu unggah
