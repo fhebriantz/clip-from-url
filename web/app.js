@@ -29,7 +29,11 @@ async function checkHealth() {
     }
     $("status").innerHTML = parts.join(" &middot; ");
   } catch {
-    $("status").innerHTML = '<span class="bad">Server tidak merespons</span>';
+    // Kondisi paling sering saat dibuka dari HP: PC-nya mati atau run.bat belum
+    // dijalankan. Pesannya dibuat menyebut tindakan, bukan cuma "gagal".
+    $("status").innerHTML =
+      '<span class="bad">Tidak terhubung ke PC - pastikan komputernya menyala '
+      + 'dan run.bat sudah dijalankan</span>';
   }
 }
 
@@ -345,6 +349,12 @@ $("formProduct").addEventListener("submit", (e) => {
 
 const stream = new EventSource("/api/events");
 stream.onmessage = (e) => renderJobs(JSON.parse(e.data));
+
+// Service worker hanya diterima browser di localhost atau HTTPS. Lewat alamat IP
+// jaringan biasa pendaftarannya ditolak, dan itu wajar - bukan kegagalan.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
 
 checkHealth();
 refreshModels();

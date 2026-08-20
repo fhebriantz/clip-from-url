@@ -163,6 +163,29 @@ alamat untuk HP akan tercetak lengkap dengan **kode QR** yang tinggal dipindai:
 
 PIN cukup dimasukkan sekali - setelah itu tersimpan di browser HP selama 30 hari.
 
+### Memasang sebagai aplikasi di HP
+
+Setelah UI terbuka di HP, kamu bisa memasangnya ke layar utama supaya terbuka
+seperti aplikasi biasa - tanpa bilah alamat browser, dengan ikon sendiri.
+
+**iPhone (Safari):** tekan tombol Bagikan, pilih **Tambahkan ke Layar Utama**.
+**Android (Chrome):** tekan menu titik tiga, pilih **Tambahkan ke layar utama**.
+
+Yang perlu diketahui: **aplikasi ini tetap butuh PC menyala.** HP hanya berfungsi
+sebagai remote - semua berkas dan pemrosesan ada di komputer. Kalau PC mati atau
+`run.bat` belum dijalankan, aplikasi tetap terbuka tapi menampilkan:
+
+```
+Tidak terhubung ke PC - pastikan komputernya menyala dan run.bat sudah dijalankan
+```
+
+Satu batasan teknis: **service worker** - yang membuat kerangka tampilan tersimpan
+di HP - hanya diizinkan browser lewat `localhost` atau HTTPS. Karena akses jaringan
+memakai alamat `http://192.168.x.x`, browser menolak mendaftarkannya. Ikon, nama,
+dan mode tanpa bilah alamat tetap bekerja lewat manifest; yang tidak aktif hanya
+penyimpanan kerangkanya. Ini tidak mengurangi fungsi apa pun, karena aplikasinya
+memang selalu butuh server.
+
 ### Kenapa PIN wajib
 
 Aplikasi ini **tidak punya sistem login**. Selama hanya didengarkan di `127.0.0.1`
