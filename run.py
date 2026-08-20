@@ -14,7 +14,7 @@ import urllib.request
 import webbrowser
 
 from app.config import (
-    ACCESS_PIN, HOST, IS_WINDOWS, LAN_TERBUKA, PORT, ensure_dirs, setup_console,
+    ACCESS_PIN, HOST, IS_WINDOWS, LAN_TERBUKA, PORT, ROOT, ensure_dirs, setup_console,
 )
 from app.tools import add_bin_to_path, ensure_ffmpeg, find_binary
 
@@ -39,6 +39,11 @@ def prepare() -> bool:
     setup_console()
     ensure_dirs()
     add_bin_to_path()
+
+    baru = lengkapi_env()
+    if baru:
+        print(f"[SETUP] Opsi baru ditambahkan ke .env: {', '.join(baru)}")
+        print("[SETUP] Buka .env kalau mau mengaturnya.")
 
     if find_binary("ffmpeg") is None:
         if not _fetch("FFmpeg", ensure_ffmpeg):
@@ -123,6 +128,78 @@ def bebaskan_port(port: int) -> bool:
     return False
 
 
+def redam_galat_koneksi_windows() -> None:
+    """Hilangkan traceback ConnectionResetError yang tidak berbahaya di Windows.
+
+    Saat browser menutup koneksi mendadak - berpindah halaman, menutup tab,
+    memutus SSE - asyncio Windows mencetak traceback panjang berisi
+    `[WinError 10054] An existing connection was forcibly closed`. Tidak ada
+    yang gagal; server tetap sehat. Tapi tampilannya seperti aplikasi crash dan
+    membuat panik, jadi galat spesifik itu ditelan di sini.
+    """
+    if not IS_WINDOWS:
+        return
+    try:
+        from asyncio.proactor_events import _ProactorBasePipeTransport
+    except ImportError:
+        return
+
+    asli = _ProactorBasePipeTransport._call_connection_lost
+
+    def dibungkus(self, exc):
+        try:
+            asli(self, exc)
+        except (ConnectionResetError, ConnectionAbortedError):
+            pass
+
+    _ProactorBasePipeTransport._call_connection_lost = dibungkus
+
+
+def lengkapi_env() -> list[str]:
+    """Tambahkan kunci baru dari .env.example ke .env milik pengguna.
+
+    Berkas .env dibuat sekali saat pertama dijalankan lalu tidak pernah disentuh
+    lagi. Akibatnya setiap opsi baru yang ditambahkan sesudah itu tidak pernah
+    muncul di berkas pengguna, dan opsinya seolah tidak ada. Nilai yang sudah
+    diisi tidak pernah diubah - hanya kunci yang belum ada yang ditambahkan.
+    """
+    contoh, punya = ROOT / ".env.example", ROOT / ".env"
+    if not contoh.is_file() or not punya.is_file():
+        return []
+
+    def kunci(teks: str) -> list[str]:
+        out = []
+        for baris in teks.splitlines():
+            b = baris.strip()
+            if b and not b.startswith("#") and "=" in b:
+                out.append(b.split("=", 1)[0].strip())
+        return out
+
+    isi_contoh = contoh.read_text(encoding="utf-8")
+    sudah = set(kunci(punya.read_text(encoding="utf-8")))
+    kurang = [k for k in kunci(isi_contoh) if k not in sudah]
+    if not kurang:
+        return []
+
+    # Ambil baris beserta komentar penjelasnya dari .env.example.
+    baris_contoh = isi_contoh.splitlines()
+    tambahan: list[str] = []
+    for k in kurang:
+        for i, baris in enumerate(baris_contoh):
+            if baris.strip().startswith(f"{k}="):
+                j = i
+                while j > 0 and baris_contoh[j - 1].strip().startswith("#"):
+                    j -= 1
+                tambahan.append("")
+                tambahan.extend(baris_contoh[j:i + 1])
+                break
+
+    with punya.open("a", encoding="utf-8") as f:
+        f.write("\n\n# --- opsi baru, ditambahkan otomatis ---")
+        f.write("\n".join(tambahan) + "\n")
+    return kurang
+
+
 def _ip_lan() -> str:
     """Alamat IP komputer ini di jaringan lokal."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -181,6 +258,7 @@ def main() -> int:
     if not bebaskan_port(PORT):
         return 1
 
+    redam_galat_koneksi_windows()
     if not info_akses():
         return 1
     print("[OK] Tekan Ctrl+C untuk berhenti.\n")

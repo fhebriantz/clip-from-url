@@ -374,6 +374,20 @@ netstat -ano | findstr :8765
 taskkill /PID <nomor-pid> /F
 ```
 
+### `ConnectionResetError: [WinError 10054]` di jendela terminal
+Muncul saat browser menutup koneksi mendadak - berpindah halaman, menutup tab.
+**Tidak ada yang rusak**, server tetap sehat. Sejak versi terbaru traceback ini
+sudah diredam; kalau masih muncul, artinya kamu menjalankan versi lama - lakukan
+`git pull`.
+
+### Opsi baru di README tidak ada di `.env` saya
+Berkas `.env` dibuat sekali saat pertama dijalankan dan tidak ikut berubah saat
+ada opsi baru. Jalankan aplikasi sekali - kunci yang belum ada **ditambahkan
+otomatis** di bagian bawah berkas, dan nilai yang sudah kamu isi tidak diubah:
+```
+[SETUP] Opsi baru ditambahkan ke .env: HOST, ACCESS_PIN
+```
+
 ### `[Errno 10048]` (Windows) atau `[Errno 98] Address already in use` (Linux)
 Pesan lengkapnya di Windows: `only one usage of each socket address ... is normally
 permitted`. Seharusnya sudah tidak muncul karena port dibebaskan otomatis. Kalau
