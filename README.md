@@ -63,7 +63,7 @@ Menjalankan ulang setelah itu hanya butuh beberapa detik.
 Hasilnya tersimpan di `data/output/<id-job>/`, berisi dua berkas:
 
 - `<nama-produk>.mp4` - videonya
-- `<nama-produk>.txt` - caption dan hashtag, siap salin
+- `<nama-produk>.txt` - caption, hashtag, dan naskah narasinya
 
 ## Semua kolom di UI
 
@@ -174,8 +174,25 @@ OUTPUT_DIR=~/GoogleDrive/clip-from-url
 ```
 
 Setelah itu tiap video jadi akan muncul sendiri di aplikasi Drive di HP, lengkap
-dengan berkas caption `.txt`-nya. Tinggal buka TikTok, pilih videonya dari galeri,
-lalu tempel captionnya.
+dengan berkas `.txt`-nya. Tinggal buka TikTok, pilih videonya dari galeri, lalu
+tempel captionnya.
+
+Isi berkas `.txt` dibagi dua bagian:
+
+```
+CAPTION UNTUK DIPOSTING
+=======================
+<caption + hashtag>
+
+NARASI (buat TTS TikTok atau direkam sendiri)
+=============================================
+<naskah per kalimat>
+```
+
+Bagian narasi disertakan karena **TikTok punya text-to-speech sendiri** yang lebih
+disukai algoritmanya, dan naskah yang sama juga bisa kamu bacakan dengan suaramu
+sendiri. Videonya tetap keluar lengkap dengan narasi Gemini - kalau mau memakai
+suara TikTok, bisukan saja audio aslinya saat mengedit di aplikasi.
 
 Kalau dikosongkan, hasilnya tetap di `data/output/` seperti biasa.
 
