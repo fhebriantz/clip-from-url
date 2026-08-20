@@ -538,6 +538,8 @@ run.bat / run.sh   pintu masuk
 app/               kode aplikasi
 web/               UI (HTML/CSS/JS, tanpa build step)
 assets/fonts/      font subtitle + lisensinya
+icon.jpeg          gambar sumber untuk ikon aplikasi
+web/icons/         ikon hasil olahan (PNG) untuk PWA dan favicon
 bin/               FFmpeg hasil unduhan otomatis
 data/output/       video jadi
 data/uploads/      aset yang kamu unggah

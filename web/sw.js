@@ -4,9 +4,10 @@
    Catatan: hanya aktif di localhost atau HTTPS. Saat dibuka lewat alamat IP
    jaringan biasa (http://192.168.x.x), browser menolak mendaftarkannya. */
 
-const VERSI = "cfu-v1";
+const VERSI = "cfu-v2";
 const KERANGKA = ["/", "/style.css", "/app.js", "/manifest.json",
-                  "/icons/icon-192.png", "/icons/icon-512.png"];
+                  "/icons/icon-192.png", "/icons/icon-512.png",
+                  "/icons/favicon-64.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSI).then((c) => c.addAll(KERANGKA)).then(() => self.skipWaiting()));
