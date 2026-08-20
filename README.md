@@ -171,6 +171,13 @@ seperti aplikasi biasa - tanpa bilah alamat browser, dengan ikon sendiri.
 **iPhone (Safari):** tekan tombol Bagikan, pilih **Tambahkan ke Layar Utama**.
 **Android (Chrome):** tekan menu titik tiga, pilih **Tambahkan ke layar utama**.
 
+Aplikasi menampilkan petunjuk ini sendiri di bagian atas saat dibuka dari HP.
+
+**Popup otomatis tidak akan muncul** saat diakses lewat alamat jaringan. Chrome
+hanya menawarkannya di `localhost` atau HTTPS, dan itu aturan browser yang tidak
+bisa diakali dari kode. Pemasangan lewat menu tetap bekerja penuh - ikon, nama,
+dan mode tanpa bilah alamat semuanya jalan.
+
 Yang perlu diketahui: **aplikasi ini tetap butuh PC menyala.** HP hanya berfungsi
 sebagai remote - semua berkas dan pemrosesan ada di komputer. Kalau PC mati atau
 `run.bat` belum dijalankan, aplikasi tetap terbuka tapi menampilkan:
@@ -396,6 +403,16 @@ Proses lama tidak mau berhenti, biasanya karena kurang hak akses.
 netstat -ano | findstr :8765
 taskkill /PID <nomor-pid> /F
 ```
+
+### Server masih jalan setelah jendela terminal ditutup
+Sudah diperbaiki: menutup jendela konsol kini benar-benar menghentikan server.
+Menutup jendela mengirim `CTRL_CLOSE_EVENT`, bukan Ctrl+C, dan Python tidak
+menanggapinya secara bawaan - itu sebabnya versi lama meninggalkan proses hidup
+di latar belakang.
+
+Kalau masih terjadi, kamu menjalankan versi lama - lakukan `git pull`. Sebagai
+pengaman kedua, menjalankan `run.bat` berikutnya akan menghentikan sendiri
+instance lama yang masih memegang port.
 
 ### `ConnectionResetError: [WinError 10054]` di jendela terminal
 Muncul saat browser menutup koneksi mendadak - berpindah halaman, menutup tab.

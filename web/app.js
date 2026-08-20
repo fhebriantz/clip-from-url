@@ -91,6 +91,64 @@ $("jobs").addEventListener("click", async (e) => {
   await fetch(`/api/jobs/${id}`, { method: "DELETE" });
 });
 
+/* ------------------------------------------------------- pasang aplikasi */
+
+let PROMPT_PASANG = null;
+
+function sudahTerpasang() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
+
+function tampilkanAjakanPasang() {
+  if (sudahTerpasang() || localStorage.getItem("pasang-ditutup") === "1") return;
+
+  const el = $("pasang");
+  const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const sentuh = matchMedia("(pointer: coarse)").matches;
+
+  if (PROMPT_PASANG) {
+    // Popup bawaan browser tersedia - cukup sediakan tombolnya.
+    el.innerHTML = `<span>Pasang sebagai aplikasi di perangkat ini</span>
+      <span class="pasang-aksi">
+        <button type="button" id="btnPasang">Pasang</button>
+        <button type="button" class="link-btn" id="btnTutupPasang">Nanti</button>
+      </span>`;
+  } else if (sentuh) {
+    // Di alamat http biasa, browser tidak menawarkan popup otomatis, jadi
+    // langkahnya dijelaskan supaya tidak perlu ditebak sendiri.
+    const langkah = iOS
+      ? "tekan tombol Bagikan, lalu pilih Tambahkan ke Layar Utama"
+      : "buka menu titik tiga, lalu pilih Tambahkan ke layar utama";
+    el.innerHTML = `<span>Biar terbuka seperti aplikasi: ${langkah}.</span>
+      <span class="pasang-aksi">
+        <button type="button" class="link-btn" id="btnTutupPasang">Mengerti</button>
+      </span>`;
+  } else {
+    return;
+  }
+  el.hidden = false;
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  PROMPT_PASANG = e;
+  tampilkanAjakanPasang();
+});
+
+document.addEventListener("click", async (e) => {
+  if (e.target.id === "btnTutupPasang") {
+    localStorage.setItem("pasang-ditutup", "1");
+    $("pasang").hidden = true;
+  }
+  if (e.target.id === "btnPasang" && PROMPT_PASANG) {
+    PROMPT_PASANG.prompt();
+    await PROMPT_PASANG.userChoice;
+    PROMPT_PASANG = null;
+    $("pasang").hidden = true;
+  }
+});
+
 /* ---------------------------------------------------------------- model */
 
 function opsiModel(m) {
@@ -356,6 +414,7 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
+tampilkanAjakanPasang();
 checkHealth();
 refreshModels();
 refreshUsage();

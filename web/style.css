@@ -326,3 +326,20 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ------------------------------------------------------- ajakan memasang */
+
+.pasang {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-radius: var(--r); padding: 13px 16px; margin-bottom: 18px;
+  font-size: 13px; line-height: 1.45;
+}
+.pasang[hidden] { display: none; }
+.pasang-aksi { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.pasang button:not(.link-btn) {
+  min-height: 38px; padding: 9px 16px; font-size: 13px; border-radius: 9px;
+}
+.pasang .link-btn { padding: 9px 10px; }

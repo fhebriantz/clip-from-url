@@ -128,6 +128,44 @@ def bebaskan_port(port: int) -> bool:
     return False
 
 
+# Referensi handler harus disimpan di level modul. Kalau tidak, Python
+# membuangnya lewat garbage collector dan Windows memanggil alamat kosong.
+_HANDLER_KONSOL = None
+
+
+def matikan_saat_jendela_ditutup() -> None:
+    """Hentikan server saat jendela konsol Windows ditutup.
+
+    Menutup jendela tidak mengirim Ctrl+C, melainkan CTRL_CLOSE_EVENT, dan Python
+    tidak menanggapinya secara bawaan. Akibatnya server tetap hidup di latar
+    belakang, port tetap terpakai, dan pengguna mengira aplikasinya sudah mati.
+    """
+    global _HANDLER_KONSOL
+    if not IS_WINDOWS:
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return
+
+    CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT = 2, 5, 6
+    TIPE = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+
+    def tangani(jenis):
+        if jenis in (CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT):
+            # Windows hanya memberi beberapa detik sebelum proses dipaksa mati;
+            # keluar langsung supaya port benar-benar dilepas.
+            os._exit(0)
+        return False
+
+    _HANDLER_KONSOL = TIPE(tangani)
+    try:
+        ctypes.windll.kernel32.SetConsoleCtrlHandler(_HANDLER_KONSOL, True)
+    except Exception:  # noqa: BLE001 - bukan alasan menggagalkan aplikasi
+        pass
+
+
 def redam_galat_koneksi_windows() -> None:
     """Hilangkan traceback ConnectionResetError yang tidak berbahaya di Windows.
 
@@ -259,6 +297,7 @@ def main() -> int:
         return 1
 
     redam_galat_koneksi_windows()
+    matikan_saat_jendela_ditutup()
     if not info_akses():
         return 1
     print("[OK] Tekan Ctrl+C untuk berhenti.\n")
