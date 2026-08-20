@@ -1,11 +1,19 @@
 """Entry point: siapkan FFmpeg, jalankan server, buka browser."""
 from __future__ import annotations
 
+import json
+import os
+import re
+import signal
+import socket
+import subprocess
 import sys
 import threading
+import time
+import urllib.request
 import webbrowser
 
-from app.config import PORT, ensure_dirs, setup_console
+from app.config import IS_WINDOWS, PORT, ensure_dirs, setup_console
 from app.tools import add_bin_to_path, ensure_ffmpeg, find_binary
 
 
@@ -38,8 +46,85 @@ def prepare() -> bool:
     return True
 
 
+def _pid_pemakai_port(port: int) -> list[int]:
+    """PID proses yang sedang mendengarkan port ini."""
+    if IS_WINDOWS:
+        out = subprocess.run(["netstat", "-ano", "-p", "TCP"],
+                             capture_output=True, text=True, errors="replace").stdout
+        pids = []
+        for baris in out.splitlines():
+            k = baris.split()
+            if len(k) >= 5 and k[3].upper() == "LISTENING" and k[1].endswith(f":{port}"):
+                if k[4].isdigit() and int(k[4]) > 0:
+                    pids.append(int(k[4]))
+        return sorted(set(pids))
+
+    out = subprocess.run(["ss", "-lptnH", f"sport = :{port}"],
+                         capture_output=True, text=True, errors="replace").stdout
+    return sorted({int(m) for m in re.findall(r"pid=(\d+)", out)})
+
+
+def _port_dipakai(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1.0)
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _milik_aplikasi_ini(port: int) -> bool:
+    """Cek apakah yang memegang port itu benar-benar aplikasi ini."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=2) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        return "ffmpeg" in data and "gemini_key" in data
+    except Exception:  # noqa: BLE001 - apa pun yang bukan jawaban kita dianggap bukan
+        return False
+
+
+def bebaskan_port(port: int) -> bool:
+    """Hentikan instance lama yang masih memegang port.
+
+    Di Windows, menutup jendela konsol sering menyisakan proses server yang masih
+    hidup, sehingga menjalankan ulang gagal mengikat port. Proses hanya dihentikan
+    kalau terbukti aplikasi ini - kalau port dipakai program lain, lebih baik
+    memberi tahu daripada mematikan sesuatu yang bukan milik kita.
+    """
+    if not _port_dipakai(port):
+        return True
+
+    if not _milik_aplikasi_ini(port):
+        print(f"[ERROR] Port {port} dipakai program LAIN, bukan aplikasi ini.")
+        print(f"[ERROR] Ganti PORT di berkas .env, lalu jalankan lagi.")
+        return False
+
+    pids = _pid_pemakai_port(port)
+    if not pids:
+        print(f"[WARN] Port {port} terpakai tapi prosesnya tidak teridentifikasi.")
+        return False
+
+    print(f"[SETUP] Instance lama masih jalan di port {port}, dihentikan...")
+    for pid in pids:
+        try:
+            if IS_WINDOWS:
+                subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                               capture_output=True, check=False)
+            else:
+                os.kill(pid, signal.SIGTERM)
+            print(f"[SETUP] Proses {pid} dihentikan.")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[WARN] Gagal menghentikan proses {pid}: {exc}")
+
+    for _ in range(20):
+        if not _port_dipakai(port):
+            return True
+        time.sleep(0.25)
+    print(f"[ERROR] Port {port} masih terpakai. Tutup manual atau ganti PORT di .env.")
+    return False
+
+
 def main() -> int:
     if not prepare():
+        return 1
+    if not bebaskan_port(PORT):
         return 1
 
     url = f"http://127.0.0.1:{PORT}"

@@ -41,6 +41,7 @@ Alurnya sama: `.env` dibuat, isi `GEMINI_API_KEY`, jalankan lagi.
 
 ## Apa yang dilakukan skrip saat pertama kali
 
+0. Menghentikan instance lama yang masih memegang port, kalau ada
 1. Memasang `uv` (pengelola Python) kalau belum ada
 2. Membuat `.env` dari `.env.example`
 3. Memasang dependency Python ke folder `.venv/`
@@ -315,16 +316,28 @@ run.bat
 
 ## Masalah saat menjalankan
 
-### `[Errno 10048]` (Windows) atau `[Errno 98] Address already in use` (Linux)
-Pesan lengkapnya di Windows: `only one usage of each socket address ... is normally
-permitted`. Port 8765 sudah dipakai program lain, atau instance sebelumnya masih
-hidup.
-**Solusi Windows:**
+### `[SETUP] Instance lama masih jalan di port 8765, dihentikan...`
+Bukan error. Aplikasi menemukan instance sebelumnya yang masih hidup - sering
+terjadi di Windows kalau jendela konsol ditutup tanpa menekan Ctrl+C - lalu
+menghentikannya sendiri sebelum mulai. Tidak perlu tindakan apa pun.
+
+### `[ERROR] Port 8765 dipakai program LAIN, bukan aplikasi ini`
+Port itu dipegang aplikasi lain di komputermu. Aplikasi ini **sengaja tidak
+mematikannya** - hanya proses miliknya sendiri yang boleh dihentikan.
+**Solusi:** ganti port di `.env`, misalnya `PORT=8766`.
+
+### `[ERROR] Port 8765 masih terpakai. Tutup manual atau ganti PORT`
+Proses lama tidak mau berhenti, biasanya karena kurang hak akses.
+**Solusi Windows:** jalankan Command Prompt sebagai Administrator, lalu:
 ```cmd
 netstat -ano | findstr :8765
 taskkill /PID <nomor-pid> /F
 ```
-Atau ganti port di `.env`: `PORT=8766`
+
+### `[Errno 10048]` (Windows) atau `[Errno 98] Address already in use` (Linux)
+Pesan lengkapnya di Windows: `only one usage of each socket address ... is normally
+permitted`. Seharusnya sudah tidak muncul karena port dibebaskan otomatis. Kalau
+tetap muncul, ganti port di `.env`: `PORT=8766`
 
 ### Browser tidak terbuka sendiri
 Buka manual: `http://127.0.0.1:8765`
