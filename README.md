@@ -62,8 +62,24 @@ Gadis (wanita).
 
 ## Aset dan deskripsi sendiri
 
-Dua kolom opsional di UI:
+Halaman produk **hanya dibuka kalau ada yang benar-benar dibutuhkan darinya**, yaitu
+judul atau gambar. Kalau kamu sudah mengisi nama produk dan mengunggah asetmu
+sendiri, tautannya murni arsip - tidak ditembak sama sekali, jadi job tidak ikut
+gagal saat marketplace sedang memblokir.
 
+| Yang kamu isi | Tautan dibuka? |
+|---|---|
+| URL saja | ya |
+| URL + nama produk, tanpa aset | ya (butuh gambarnya) |
+| URL + nama produk + aset | **tidak** - arsip saja |
+| Tanpa URL, ada nama + aset | tidak ada tautan |
+
+Tanpa URL, nama produk dan minimal satu aset wajib diisi. Kalau tautannya hanya
+arsip, platformnya bebas - boleh Linktree, TikTok affiliate, apa saja.
+
+Kolom opsional di UI:
+
+- **Nama produk** - kalau diisi, judul tidak diambil dari halaman.
 - **Aset sendiri** - unggah gambar atau klip video. Kalau diisi, gambar tidak lagi
   diambil dari halaman produk. Aset dipakai berurutan dan diputar ulang kalau
   scene-nya lebih banyak.

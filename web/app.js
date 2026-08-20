@@ -330,6 +330,7 @@ $("formProduct").addEventListener("submit", (e) => {
   e.preventDefault();
   submit(e.target, "/api/jobs/product", {
     url: $("pUrl").value.trim(),
+    title: $("pTitle").value.trim(),
     duration: Number($("pDuration").value),
     voice: $("pVoice").value,
     hook_card: $("pHookCard").checked,

@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from . import assets, db, models_info, usage, worker
 from .services import gemini as gemini_service
@@ -56,7 +56,10 @@ class AssetRef(BaseModel):
 
 
 class ProductRequest(BaseModel):
-    url: str = Field(min_length=8)
+    # Boleh kosong kalau nama produk dan aset diisi sendiri. Tautannya hanya
+    # dipakai sebagai arsip, dan tidak diambil kalau tidak ada yang dibutuhkan.
+    url: str = ""
+    title: str = Field(default="", max_length=200)
     duration: int = Field(default=30, ge=15, le=60)
     voice: str = "acak"
     hook_card: bool = True
@@ -74,13 +77,30 @@ class ProductRequest(BaseModel):
     @classmethod
     def _check_url(cls, v: str) -> str:
         v = v.strip()
-        if not v.startswith(("http://", "https://")):
+        if v and not v.startswith(("http://", "https://")):
             raise ValueError("URL harus diawali http:// atau https://")
-        try:
-            detect_source(v)
-        except UnsupportedURL as exc:
-            raise ValueError(str(exc)) from exc
         return v
+
+    @model_validator(mode="after")
+    def _cukup_datanya(self) -> "ProductRequest":
+        """Tautan hanya wajib kalau ada yang perlu diambil darinya."""
+        if self.url:
+            perlu_ambil = not self.title.strip() or not self.assets
+            if perlu_ambil:
+                # Baru di sini platformnya harus didukung, karena mau dibuka.
+                try:
+                    detect_source(self.url)
+                except UnsupportedURL as exc:
+                    raise ValueError(
+                        f"{exc} Kalau tautan ini cuma untuk arsip, isi Nama produk "
+                        "dan unggah asetmu sendiri."
+                    ) from exc
+            return self
+        if not self.title.strip():
+            raise ValueError("Isi URL produk, atau isi Nama produk kalau tanpa tautan.")
+        if not self.assets:
+            raise ValueError("Tanpa URL produk, aset gambar atau video wajib diunggah.")
+        return self
 
     @field_validator("script_model")
     @classmethod
@@ -134,6 +154,7 @@ def create_product(req: ProductRequest) -> dict[str, str]:
             "voice": req.voice,
             "hook_card": req.hook_card,
             "price_text": req.price_text,
+            "title": req.title,
             "script_model": req.script_model,
             "tts_model": req.tts_model,
             "assets": [a.model_dump() for a in req.assets],

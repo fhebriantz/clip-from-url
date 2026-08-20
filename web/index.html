@@ -15,14 +15,17 @@
 <main>
   <section class="card">
     <h2>URL produk jadi video</h2>
-    <p class="hint">Tempel URL produk Shopee, Tokopedia, atau tautan share TikTok Shop.
-      Gambar dan deskripsi diambil otomatis, Gemini menulis naskahnya, lalu dibacakan
-      dan disusun jadi video vertikal 9:16.</p>
+    <p class="hint">Tempel URL produk Shopee, Tokopedia, atau tautan share TikTok Shop -
+      gambar dan deskripsinya diambil otomatis. Atau isi sendiri nama produk, aset, dan
+      deskripsinya; halaman produk cuma dibuka kalau memang ada yang dibutuhkan dari sana.</p>
 
     <form id="formProduct">
-      <label>URL produk
-        <input id="pUrl" type="url" required
+      <label>URL produk <span class="opt">(opsional kalau Nama produk dan aset diisi sendiri - dipakai sebagai arsip saja)</span>
+        <input id="pUrl" type="url"
                placeholder="Shopee, Tokopedia, atau tautan share TikTok Shop">
+      </label>
+      <label>Nama produk <span class="opt">(opsional - kalau diisi, judul tidak diambil dari halaman)</span>
+        <input id="pTitle" type="text" placeholder="Gyomi Oversized Shirt Blouse Atasan Wanita">
       </label>
       <label>Harga <span class="opt">(opsional - isi kalau tidak terbaca otomatis, wajib untuk TikTok Shop)</span>
         <input id="pPrice" type="text" placeholder="599000">

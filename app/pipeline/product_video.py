@@ -21,7 +21,9 @@ import httpx
 from .. import assets
 from ..config import ASSETS_DIR, OUTPUT_DIR, TTS_PROVIDER, WORK_DIR
 from ..services import gemini, tts
-from ..sources.product import _HEADERS, extract, parse_price_input, price_vague
+from ..sources.product import (
+    Product, _HEADERS, extract, parse_price_input, price_vague,
+)
 from ..tools import ensure_ffmpeg, ffprobe_duration, run_ffmpeg
 
 Report = Callable[[int, str], None]
@@ -405,13 +407,32 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
 
     asset_ids = list(params.get("assets") or [])
     custom_desc = str(params.get("description") or "").strip()
+    custom_title = str(params.get("title") or "").strip()
 
-    report(5, "Membaca halaman produk...")
-    product = extract(url)
+    # Halaman produk hanya diambil kalau ada yang benar-benar dibutuhkan darinya:
+    # judul atau gambar. Deskripsi dan harga sifatnya pelengkap. Kalau pengguna
+    # sudah menyediakan judul dan asetnya sendiri, tautannya murni arsip - tidak
+    # ada gunanya menembak halaman yang bisa saja diblokir dan menggagalkan job.
+    perlu_ambil = bool(url) and (not custom_title or not asset_ids)
+
+    if perlu_ambil:
+        report(5, "Membaca halaman produk...")
+        product = extract(url)
+    else:
+        report(5, "Memakai data yang kamu isi sendiri...")
+        product = Product(url=url, source="manual")
+
+    if custom_title:
+        product.title = custom_title
     if custom_desc:
         # Deskripsi tulisan pengguna selalu menang atas hasil scraping: itu yang
         # dia tahu tentang produknya, bukan tebakan dari halaman.
         product.description = custom_desc
+    if not product.title:
+        raise RuntimeError(
+            "Nama produk kosong dan tidak bisa diambil dari tautan. "
+            "Isi kolom Nama produk."
+        )
 
     # TikTok Shop tidak pernah mengekspos harga, dan Shopee kadang juga tidak.
     # Harga yang diketik pengguna selalu menang atas hasil ekstraksi.
