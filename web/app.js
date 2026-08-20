@@ -334,6 +334,7 @@ $("formProduct").addEventListener("submit", (e) => {
     duration: Number($("pDuration").value),
     voice: $("pVoice").value,
     hook_card: $("pHookCard").checked,
+    narration: $("pNarration").checked,
     price_text: $("pPrice").value.trim(),
     script_model: $("pScriptModel").value,
     tts_model: $("pTtsModel").value,

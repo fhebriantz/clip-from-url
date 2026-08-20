@@ -78,6 +78,7 @@ Hasilnya tersimpan di `data/output/<id-job>/`, berisi dua berkas:
 | **Suara narator** | ya | Acak, atau kunci ke satu suara |
 | **Model naskah / suara** | ya | Sudah terisi rekomendasi |
 | **Kartu hook** | - | Teks besar pembuka, sebaiknya dibiarkan aktif |
+| **Pakai suara narasi** | - | Matikan untuk hemat kuota TTS - naskahnya tetap ditulis di `.txt` |
 
 ## Kapan tautan produk dibuka
 
@@ -227,6 +228,20 @@ Batas tier gratis berbeda per model:
 | model gambar (`*-image`) | **0** - butuh akun berbayar |
 
 Satu video memakai **2 request**: satu naskah, satu narasi.
+
+### Mode tanpa suara narasi
+
+Matikan centang **Pakai suara narasi** kalau kamu memang berencana memakai TTS
+TikTok atau suaramu sendiri. Efeknya:
+
+- **Tidak ada request TTS sama sekali** - satu video hanya memakai 1 request naskah
+- Kapasitas gratis naik jadi **20 video per hari tanpa menyentuh kuota TTS**
+- Naskah narasinya tetap ditulis lengkap di berkas `.txt`
+- Videonya keluar dengan jalur audio senyap, siap kamu isi suara di aplikasi
+
+Durasi tiap scene diperkirakan dari jumlah kata (sekitar 2,5 kata per detik,
+dikalibrasi dari narasi Gemini yang sudah terukur). Karena ini perkiraan, hasilnya
+bisa sedikit lebih meleset dari target durasi dibanding mode bersuara.
 
 **Kapasitas gratis: sekitar 20 video per hari.** Sepuluh video pertama memakai suara
 3.1 yang paling energik; sisanya otomatis turun ke 2.5 tanpa job gagal. Kerjakan

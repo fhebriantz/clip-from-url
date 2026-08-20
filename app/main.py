@@ -63,6 +63,8 @@ class ProductRequest(BaseModel):
     duration: int = Field(default=30, ge=15, le=60)
     voice: str = "acak"
     hook_card: bool = True
+    # Matikan untuk menghemat kuota TTS. Naskahnya tetap dibuat dan ditulis ke .txt.
+    narration: bool = True
     # Kosong berarti ikut setelan .env. Cadangan tetap dipakai kalau pilihan gagal.
     script_model: str = ""
     tts_model: str = ""
@@ -153,6 +155,7 @@ def create_product(req: ProductRequest) -> dict[str, str]:
             "duration": req.duration,
             "voice": req.voice,
             "hook_card": req.hook_card,
+            "narration": req.narration,
             "price_text": req.price_text,
             "title": req.title,
             "script_model": req.script_model,

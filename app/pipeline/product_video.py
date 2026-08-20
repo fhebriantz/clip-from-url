@@ -34,6 +34,12 @@ MIN_IMAGE_PX = 400
 MAX_IMAGES = 6
 MAX_SCENES = 12
 
+# Dipakai kalau narasi suara dimatikan: durasi scene diperkirakan dari jumlah kata,
+# karena tidak ada audio yang bisa diukur. Angkanya dikalibrasi dari narasi Gemini
+# yang sudah terukur - hook 6 kata terbaca 2,77 detik, scene 13 kata 4,89 detik.
+KATA_PER_DETIK = 2.48
+DURASI_SCENE_MIN = 2.5
+
 # libx264 sudah memakai banyak core untuk satu encode, jadi menjalankan beberapa
 # scene berbarengan hanya menambah sekitar 1,6x - bukan sebanyak jumlah prosesnya.
 # Diukur di mesin 8 core untuk 4 scene: sekuensial 16,4s, paralel 3 10,4s,
@@ -75,6 +81,11 @@ SECONDS_PER_SCENE_EDGE = 5.0
 # Terukur setelah hening bawaan dibuang: narasi Gemini sekitar 4,9 detik per
 # scene, ditambah jeda 0,25 detik.
 SECONDS_PER_SCENE_GEMINI = 5.15
+
+
+def _perkiraan_durasi(teks: str) -> float:
+    """Perkiraan lama membaca sepotong narasi, untuk mode tanpa suara."""
+    return max(DURASI_SCENE_MIN, len(teks.split()) / KATA_PER_DETIK)
 
 
 def _seconds_per_scene() -> float:
@@ -363,15 +374,25 @@ def _gabung(listing: Path, audios: list[Path], pads: list[float], out: Path) -> 
     video-nya lebih dulu supaya total audio persis sama dengan total video.
     """
     base = ["-f", "concat", "-safe", "0", "-i", str(listing)]
-    for a in audios:
-        base += ["-i", str(a)]
-    padded = "".join(
-        f"[{i + 1}:a]apad=pad_dur={pads[i]}[pa{i}];" for i in range(len(audios))
-    )
-    joined = "".join(f"[pa{i}]" for i in range(len(audios)))
-    audio_args = [
-        "-filter_complex", f"{padded}{joined}concat=n={len(audios)}:v=0:a=1[aout]",
-        "-map", "0:v", "-map", "[aout]",
+
+    if audios:
+        for a in audios:
+            base += ["-i", str(a)]
+        padded = "".join(
+            f"[{i + 1}:a]apad=pad_dur={pads[i]}[pa{i}];" for i in range(len(audios))
+        )
+        joined = "".join(f"[pa{i}]" for i in range(len(audios)))
+        audio_args = [
+            "-filter_complex", f"{padded}{joined}concat=n={len(audios)}:v=0:a=1[aout]",
+            "-map", "0:v", "-map", "[aout]",
+        ]
+    else:
+        # Mode tanpa narasi tetap diberi jalur suara senyap. Berkas video tanpa
+        # audio sama sekali kadang ditolak atau diperlakukan aneh saat diunggah.
+        base += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+        audio_args = ["-map", "0:v", "-map", "1:a"]
+
+    audio_args += [
         # Naikkan ke 44.1 kHz stereo: sebagian platform menolak mono 24 kHz.
         "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-ac", "2", "-shortest",
         "-movflags", "+faststart",
@@ -402,6 +423,7 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     layout = params.get("layout") or rnd.choice(LAYOUTS)
     hook_style = params.get("hook_style") or rnd.choice(list(gemini.HOOK_STYLES))
     gender, voice_name = tts.resolve(params.get("voice") or "acak", rnd)
+    pakai_suara = params.get("narration", True) is not False
     speech_style = params.get("speech_style") or rnd.choice(list(tts.STYLES))
     rate = rnd.choice(TTS_RATES)
 
@@ -499,16 +521,23 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
 
     report(45, f"Menyiapkan narasi ({voice_name}, gaya {speech_style})...")
     tts_meta: dict = {}
-    audios = tts.synth_many(
-        narrations, gender=gender, voice_name=voice_name, style=speech_style,
-        rate=rate, on_status=lambda m: report(45, m), meta=tts_meta,
-        model_override=str(params.get("tts_model") or ""),
-    )
-
-    durations = [ffprobe_duration(a) for a in audios]
-    for i, dur in enumerate(durations):
-        if dur <= 0:
-            raise RuntimeError(f"Durasi audio bagian {i + 1} tidak terbaca.")
+    if pakai_suara:
+        audios = tts.synth_many(
+            narrations, gender=gender, voice_name=voice_name, style=speech_style,
+            rate=rate, on_status=lambda m: report(45, m), meta=tts_meta,
+            model_override=str(params.get("tts_model") or ""),
+        )
+        durations = [ffprobe_duration(a) for a in audios]
+        for i, dur in enumerate(durations):
+            if dur <= 0:
+                raise RuntimeError(f"Durasi audio bagian {i + 1} tidak terbaca.")
+    else:
+        # Naskahnya tetap ditulis ke berkas .txt; yang dilewati hanya pembuatan
+        # audionya, supaya kuota TTS tidak terpakai sama sekali.
+        report(45, "Tanpa suara narasi, durasi scene diperkirakan dari naskah...")
+        audios = []
+        durations = [_perkiraan_durasi(teks) for teks, _ in narrations]
+        tts_meta = {"provider": "tanpa suara", "voice": "-", "style": "-"}
 
     offset = 1 if hook_text else 0
     clips = [work / "scene-hook.mp4"] if hook_text else []
