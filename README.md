@@ -346,6 +346,31 @@ Batas tier gratis berbeda per model:
 
 Satu video memakai **2 request**: satu naskah, satu narasi.
 
+### Naskah dan narasi tersimpan
+
+Kalau kamu membuat ulang video dari produk yang sama, naskah dan narasi suaranya
+dipakai ulang - **nol request API**. Membuat ulang untuk mengganti gambar, tata
+letak, atau aset jadi gratis sepenuhnya.
+
+Terukur pada lima kali pembuatan berturut-turut:
+
+| Percobaan | Request naskah | Request suara |
+|---|---|---|
+| pertama kali | 1 | 1 |
+| ulang, semua sama | **0** | **0** |
+| ulang, durasi diubah | 1 | 1 |
+| ulang lagi ke durasi semula | **0** | **0** |
+| centang "naskah tersimpan" dimatikan | 1 | 1 |
+
+Durasi yang berubah memang menghasilkan naskah baru, karena jumlah scene-nya beda.
+
+Kalau suara diatur **Acak**, pengulangan mengikuti suara yang audionya sudah ada -
+kalau undian jatuh ke suara lain, audionya harus dibuat ulang dan kuota tetap
+terpakai. Gaya hook juga ikut dipakai ulang supaya naskahnya benar-benar sama.
+
+Matikan centang **Pakai naskah & narasi tersimpan** kalau ingin naskah yang
+benar-benar baru. Simpanan dibuang otomatis setelah 14 hari tidak dipakai.
+
 ### Mode tanpa suara narasi
 
 Matikan centang **Pakai suara narasi** kalau kamu memang berencana memakai TTS

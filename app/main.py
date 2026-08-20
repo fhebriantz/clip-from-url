@@ -102,6 +102,8 @@ class ProductRequest(BaseModel):
     hook_card: bool = True
     # Matikan untuk menghemat kuota TTS. Naskahnya tetap dibuat dan ditulis ke .txt.
     narration: bool = True
+    # Matikan untuk memaksa naskah dan narasi baru walau sudah pernah dibuat.
+    pakai_simpanan: bool = True
     # Kosong berarti ikut setelan .env. Cadangan tetap dipakai kalau pilihan gagal.
     script_model: str = ""
     tts_model: str = ""
@@ -193,6 +195,7 @@ def create_product(req: ProductRequest) -> dict[str, str]:
             "voice": req.voice,
             "hook_card": req.hook_card,
             "narration": req.narration,
+            "pakai_simpanan": req.pakai_simpanan,
             "price_text": req.price_text,
             "title": req.title,
             "script_model": req.script_model,

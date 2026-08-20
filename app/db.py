@@ -52,6 +52,14 @@ CREATE TABLE IF NOT EXISTS usage (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_usage_day ON usage(day);
+CREATE TABLE IF NOT EXISTS cache (
+    kunci      TEXT PRIMARY KEY,
+    jenis      TEXT NOT NULL,
+    isi        TEXT NOT NULL,
+    dipakai_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cache_jenis ON cache(jenis);
 """
 
 
@@ -230,6 +238,40 @@ def usage_quota_failures(day: str) -> int:
             (day,),
         ).fetchone()
     return int(row["n"] or 0)
+
+
+def cache_ambil(kunci: str) -> str | None:
+    """Ambil isi cache dan tandai baru dipakai (untuk pembersihan nanti)."""
+    with _lock:
+        row = _db().execute("SELECT isi FROM cache WHERE kunci=?", (kunci,)).fetchone()
+        if row:
+            _db().execute("UPDATE cache SET dipakai_at=? WHERE kunci=?", (_now(), kunci))
+            _db().commit()
+    return row["isi"] if row else None
+
+
+def cache_simpan(kunci: str, jenis: str, isi: str) -> None:
+    ts = _now()
+    with _lock:
+        _db().execute(
+            "INSERT INTO cache (kunci, jenis, isi, dipakai_at, created_at) VALUES (?,?,?,?,?) "
+            "ON CONFLICT(kunci) DO UPDATE SET isi=excluded.isi, dipakai_at=excluded.dipakai_at",
+            (kunci, jenis, isi, ts, ts),
+        )
+        _db().commit()
+
+
+def cache_kadaluarsa(hari: int) -> list[str]:
+    """Hapus entri yang lama tidak dipakai. Kembalikan isinya untuk dibersihkan."""
+    with _lock:
+        rows = _db().execute(
+            "SELECT kunci, isi FROM cache WHERE dipakai_at < date('now', ?)",
+            (f"-{int(hari)} days",),
+        ).fetchall()
+        if rows:
+            _db().executemany("DELETE FROM cache WHERE kunci=?", [(r["kunci"],) for r in rows])
+            _db().commit()
+    return [r["isi"] for r in rows]
 
 
 def list_jobs(limit: int = 50) -> list[dict[str, Any]]:

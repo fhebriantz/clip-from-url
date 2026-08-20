@@ -418,6 +418,7 @@ $("formProduct").addEventListener("submit", (e) => {
     voice: $("pVoice").value,
     hook_card: $("pHookCard").checked,
     narration: $("pNarration").checked,
+    pakai_simpanan: $("pSimpanan").checked,
     price_text: $("pPrice").value.trim(),
     script_model: $("pScriptModel").value,
     tts_model: $("pTtsModel").value,

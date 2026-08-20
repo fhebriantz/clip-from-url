@@ -18,7 +18,7 @@ from typing import Callable
 
 import httpx
 
-from .. import assets
+from .. import assets, cache
 from ..config import ASSETS_DIR, OUTPUT_DIR, TTS_PROVIDER, WORK_DIR
 from ..services import gemini, tts
 from urllib.parse import urlparse
@@ -514,12 +514,28 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     per_scene = _seconds_per_scene()
     budget = target - (HOOK_CARD_SECONDS if use_card else 0)
     scene_count = max(2, min(round(budget / per_scene), MAX_SCENES))
-    report(35, "Menulis naskah dengan Gemini...")
-    script = gemini.write_product_script(
-        product.as_dict(), scene_count, target,
-        on_status=lambda m: report(35, m), hook_style=hook_style,
-        model_override=str(params.get("script_model") or ""),
-    )
+    pakai_simpanan = params.get("pakai_simpanan", True) is not False
+    kunci_naskah = cache.kunci_naskah(product.as_dict(), scene_count, use_card)
+    script = cache.ambil_naskah(kunci_naskah) if pakai_simpanan else None
+
+    if script:
+        # Gaya hook ikut dipakai ulang supaya naskahnya benar-benar sama.
+        hook_style = script.get("_gaya_hook") or hook_style
+        # Kalau suaranya diserahkan ke acak, ikuti suara yang audionya sudah
+        # tersimpan - kalau tidak, undian baru akan memaksa membuat audio lagi.
+        if not params.get("voice") or params.get("voice") == "acak":
+            voice_name = script.get("_suara") or voice_name
+            speech_style = script.get("_gaya_bicara") or speech_style
+            gender = tts.gender_of(voice_name) or gender
+        report(35, "Memakai naskah tersimpan, tanpa memakai kuota...")
+    else:
+        report(35, "Menulis naskah dengan Gemini...")
+        script = gemini.write_product_script(
+            product.as_dict(), scene_count, target,
+            on_status=lambda m: report(35, m), hook_style=hook_style,
+            model_override=str(params.get("script_model") or ""),
+        )
+        cache.simpan_naskah(kunci_naskah, script, hook_style, voice_name, speech_style)
     scenes = script["scenes"]
     hook_text = script["hook"] if use_card else ""
 
@@ -534,7 +550,16 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
 
     report(45, f"Menyiapkan narasi ({voice_name}, gaya {speech_style})...")
     tts_meta: dict = {}
-    if pakai_suara:
+    teks_narasi = [t for t, _ in narrations]
+    kunci_suara = cache.kunci_suara(teks_narasi, voice_name, speech_style, tts.TTS_PROVIDER)
+    simpanan = cache.ambil_suara(kunci_suara) if (pakai_suara and pakai_simpanan) else None
+
+    if pakai_suara and simpanan and len(simpanan) == len(narrations):
+        report(45, f"Memakai narasi tersimpan ({voice_name}), tanpa memakai kuota...")
+        audios = simpanan
+        durations = [ffprobe_duration(a) for a in audios]
+        tts_meta = {"provider": "simpanan", "voice": voice_name, "style": speech_style}
+    elif pakai_suara:
         audios = tts.synth_many(
             narrations, gender=gender, voice_name=voice_name, style=speech_style,
             rate=rate, on_status=lambda m: report(45, m), meta=tts_meta,
@@ -544,6 +569,8 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
         for i, dur in enumerate(durations):
             if dur <= 0:
                 raise RuntimeError(f"Durasi audio bagian {i + 1} tidak terbaca.")
+        if tts_meta.get("provider", "").startswith("gemini"):
+            audios = cache.simpan_suara(kunci_suara, audios)
     else:
         # Naskahnya tetap ditulis ke berkas .txt; yang dilewati hanya pembuatan
         # audionya, supaya kuota TTS tidak terpakai sama sekali.
@@ -643,8 +670,19 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
         score=None,
     )
 
+    # Berkas di dalam folder simpanan TIDAK boleh dihapus - itu milik bersama,
+    # bukan berkas sementara job ini. Penjagaan berdasarkan LOKASI, bukan asal
+    # usulnya: saat audio baru disimpan, daftar `audios` ikut menunjuk ke salinan
+    # di folder simpanan, dan penjagaan berbasis asal-usul melewatkannya.
+    def _milik_bersama(f: Path) -> bool:
+        try:
+            return cache.CACHE_DIR in f.resolve().parents
+        except OSError:
+            return False
+
     for tmp in list(clips) + list(audios):
-        tmp.unlink(missing_ok=True)
+        if not _milik_bersama(tmp):
+            tmp.unlink(missing_ok=True)
 
     report(100, f"Selesai. Video {total:.0f} detik siap.")
     return product.title
