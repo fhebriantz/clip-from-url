@@ -48,6 +48,16 @@ JOB_WORKERS = max(1, int(os.getenv("JOB_WORKERS", "2")))
 TTS_PROVIDER = os.getenv("TTS_PROVIDER", "gemini").strip().lower()
 PORT = int(os.getenv("PORT", "8765"))
 
+# Alamat yang didengarkan server. Bawaannya 127.0.0.1 - hanya bisa dibuka dari
+# komputer ini. Isi 0.0.0.0 supaya bisa dibuka dari HP di WiFi yang sama.
+HOST = os.getenv("HOST", "127.0.0.1").strip() or "127.0.0.1"
+LAN_TERBUKA = HOST not in ("127.0.0.1", "localhost", "::1")
+
+# PIN wajib saat diakses dari perangkat lain. Aplikasi ini tidak punya login,
+# jadi tanpa PIN siapa pun di jaringan yang sama bisa memakai kuota API-mu,
+# melihat hasil videomu, dan mengunggah berkas.
+ACCESS_PIN = os.getenv("ACCESS_PIN", "").strip()
+
 
 
 def setup_console() -> None:

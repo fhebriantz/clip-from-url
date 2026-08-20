@@ -13,7 +13,9 @@ import time
 import urllib.request
 import webbrowser
 
-from app.config import IS_WINDOWS, PORT, ensure_dirs, setup_console
+from app.config import (
+    ACCESS_PIN, HOST, IS_WINDOWS, LAN_TERBUKA, PORT, ensure_dirs, setup_console,
+)
 from app.tools import add_bin_to_path, ensure_ffmpeg, find_binary
 
 
@@ -121,20 +123,72 @@ def bebaskan_port(port: int) -> bool:
     return False
 
 
+def _ip_lan() -> str:
+    """Alamat IP komputer ini di jaringan lokal."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            # Tidak benar-benar mengirim apa pun; hanya supaya OS memilih
+            # antarmuka jaringan yang dipakai untuk keluar.
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+        except OSError:
+            return ""
+
+
+def _cetak_qr(teks: str) -> None:
+    try:
+        import qrcode
+
+        qr = qrcode.QRCode(border=1)
+        qr.add_data(teks)
+        qr.make(fit=True)
+        qr.print_ascii(invert=True)
+    except Exception:  # noqa: BLE001 - QR cuma pemanis, jangan sampai menggagalkan
+        pass
+
+
+def info_akses() -> bool:
+    """Tampilkan alamat yang bisa dibuka, termasuk dari HP."""
+    lokal = f"http://127.0.0.1:{PORT}"
+    if not LAN_TERBUKA:
+        print(f"\n[OK] clip-from-url berjalan di {lokal}")
+        print("[OK] Untuk membukanya dari HP: set HOST=0.0.0.0 dan ACCESS_PIN di .env")
+        return True
+
+    if not ACCESS_PIN:
+        print("\n[ERROR] HOST dibuka ke jaringan tapi ACCESS_PIN masih kosong.")
+        print("[ERROR] Tanpa PIN, siapa pun di WiFi yang sama bisa memakai kuota API")
+        print("[ERROR] dan mengunggah berkas. Isi ACCESS_PIN di .env lalu jalankan lagi.")
+        return False
+
+    ip = _ip_lan()
+    print(f"\n[OK] clip-from-url berjalan di {lokal}")
+    if not ip:
+        print("[WARN] Alamat IP jaringan tidak terdeteksi.")
+        return True
+
+    url_hp = f"http://{ip}:{PORT}/?pin={ACCESS_PIN}"
+    print(f"[OK] Dari HP di WiFi yang sama, buka: {url_hp}")
+    print("[OK] Atau pindai QR di bawah ini:\n")
+    _cetak_qr(url_hp)
+    print("[OK] PIN cukup dimasukkan sekali; setelah itu tersimpan di browser HP.")
+    return True
+
+
 def main() -> int:
     if not prepare():
         return 1
     if not bebaskan_port(PORT):
         return 1
 
-    url = f"http://127.0.0.1:{PORT}"
-    print(f"\n[OK] clip-from-url berjalan di {url}")
+    if not info_akses():
+        return 1
     print("[OK] Tekan Ctrl+C untuk berhenti.\n")
-    threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+    threading.Timer(1.5, lambda: webbrowser.open(f"http://127.0.0.1:{PORT}")).start()
 
     import uvicorn
 
-    uvicorn.run("app.main:app", host="127.0.0.1", port=PORT, log_level="warning")
+    uvicorn.run("app.main:app", host=HOST, port=PORT, log_level="warning")
     return 0
 
 

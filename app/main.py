@@ -5,10 +5,11 @@ import asyncio
 import contextlib
 import json
 import re
+import secrets
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -17,9 +18,11 @@ from .services import gemini as gemini_service
 from .services import tts
 from .sources.product import UnsupportedURL, detect_source
 from .config import (
+    ACCESS_PIN,
     GEMINI_API_KEY,
     GEMINI_MODEL,
     OUTPUT_DIR,
+    PORT,
     WEB_DIR,
     ensure_dirs,
     setup_console,
@@ -40,6 +43,40 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="clip-from-url", lifespan=lifespan)
+
+_PIN_COOKIE = "clip_pin"
+_LOKAL = {"127.0.0.1", "::1", "localhost"}
+
+
+@app.middleware("http")
+async def jaga_akses(request: Request, call_next):
+    """Minta PIN untuk permintaan dari perangkat lain.
+
+    Aplikasi ini tidak punya sistem login. Selama hanya didengarkan di 127.0.0.1
+    itu tidak masalah, tapi begitu dibuka ke jaringan, siapa pun di WiFi yang sama
+    bisa memakai kuota API dan mengunggah berkas. Permintaan dari komputer ini
+    sendiri tetap bebas supaya pemakaian sehari-hari tidak terganggu.
+    """
+    if not ACCESS_PIN:
+        return await call_next(request)
+
+    host = request.client.host if request.client else ""
+    if host in _LOKAL:
+        return await call_next(request)
+
+    pin = request.query_params.get("pin") or request.cookies.get(_PIN_COOKIE, "")
+    if not secrets.compare_digest(pin, ACCESS_PIN):
+        return PlainTextResponse(
+            "PIN salah atau belum diisi.\n\n"
+            f"Buka: http://<alamat-ip>:{PORT}/?pin=PIN_KAMU\n"
+            "PIN-nya tercetak di jendela tempat aplikasi dijalankan.",
+            status_code=401,
+        )
+
+    resp = await call_next(request)
+    # Simpan di cookie supaya PIN cukup dimasukkan sekali lewat URL.
+    resp.set_cookie(_PIN_COOKIE, ACCESS_PIN, max_age=30 * 24 * 3600, samesite="lax")
+    return resp
 
 
 class AssetRef(BaseModel):

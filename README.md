@@ -140,6 +140,42 @@ Tiap video mengacak empat hal supaya deretan postingan tidak terlihat seragam:
 Kombinasinya dicatat di Riwayat, jadi kamu bisa melihat gaya mana yang performanya
 bagus.
 
+## Membuka UI dari HP (WiFi yang sama)
+
+Isi dua baris di `.env`:
+
+```
+HOST=0.0.0.0
+ACCESS_PIN=482913
+```
+
+Ganti PIN dengan angka atau huruf bebas milikmu sendiri. Jalankan ulang, lalu
+alamat untuk HP akan tercetak lengkap dengan **kode QR** yang tinggal dipindai:
+
+```
+[OK] Dari HP di WiFi yang sama, buka: http://192.168.1.12:8765/?pin=482913
+[OK] Atau pindai QR di bawah ini:
+```
+
+PIN cukup dimasukkan sekali - setelah itu tersimpan di browser HP selama 30 hari.
+
+### Kenapa PIN wajib
+
+Aplikasi ini **tidak punya sistem login**. Selama hanya didengarkan di `127.0.0.1`
+itu tidak masalah. Tapi begitu dibuka ke jaringan, siapa pun di WiFi yang sama -
+kantor, kafe, kos - bisa memakai kuota API-mu, melihat hasil videomu, dan
+mengunggah berkas ke komputermu.
+
+Karena itu aplikasi **menolak jalan** kalau `HOST=0.0.0.0` tapi `ACCESS_PIN` kosong.
+Permintaan dari komputer itu sendiri tetap bebas PIN.
+
+### Kenapa tidak lewat Vercel atau tunnel
+
+Tunnel seperti ngrok atau Cloudflare Tunnel membuka aplikasi ke **seluruh internet**,
+bukan cuma WiFi rumahmu. Dengan pengamanan yang cuma satu PIN, itu risiko yang jauh
+lebih besar tanpa manfaat tambahan - komputermu tetap harus menyala dan tetap yang
+mengerjakan videonya.
+
 ## Sinkron otomatis ke HP lewat Google Drive
 
 Supaya video dan captionnya langsung sampai ke HP tanpa dipindahkan manual,
