@@ -382,6 +382,26 @@ THUMB_JUDUL_MIN = 54
 _LEBAR_HURUF = 0.55
 
 
+def _baris_judul(teks: str, dasar: int = 16, maks: int = 26) -> list[str]:
+    """Bagi judul sampul jadi baris, hindari baris terakhir yang yatim.
+
+    Lebar 16 huruf memberi teks paling besar, tapi kadang menyisakan satu kata
+    sendirian di baris terakhir - "...ribet ikat / tali" - dan itu terlihat
+    seperti salah potong. Kalau itu terjadi, barisnya dilebarkan sedikit demi
+    sedikit sampai baris terakhir tidak lagi terlalu pendek. Susunan yang sudah
+    enak tidak diutak-atik.
+    """
+    if not teks.strip():
+        return []
+    for lebar in range(dasar, maks + 1):
+        baris = _wrap(teks, width=lebar).split("\n")
+        if len(baris) > 3:
+            continue
+        if len(baris) == 1 or len(baris[-1]) >= 0.4 * max(len(b) for b in baris):
+            return baris
+    return _wrap(teks, width=maks).split("\n")
+
+
 def _ukuran_judul(baris: list[str]) -> int:
     """Perbesar judul sebisanya, tapi jangan sampai baris terpanjang meluber."""
     panjang = max((len(b) for b in baris), default=1)
@@ -416,7 +436,7 @@ def _render_thumbnail(image: Path, judul: str, harga: str, out: Path, work: Path
     terlihat satu paket.
     """
     font = _font()
-    baris = _wrap(judul, width=16).split("\n") if judul.strip() else []
+    baris = _baris_judul(judul)
     fs = _ukuran_judul(baris)
     spasi = int(fs * 0.18)
 
