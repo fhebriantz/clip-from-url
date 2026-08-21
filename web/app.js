@@ -254,6 +254,23 @@ function frameUrl(a, t) {
     + `&crop=${encodeURIComponent(c)}&pos=${p}&v=${a.rev ?? 0}`;
 }
 
+// Produk dipasang selebar ~982px di video 1080x1920. Memotong gambar membuang
+// piksel, jadi makin ketat crop-nya makin jauh sisanya harus diperbesar - itu
+// yang bikin hasilnya lembut, bukan sebaliknya.
+const LEBAR_TAMPIL = 982;
+const RASIO_ANGKA = { "asli": 0, "1:1": 1, "3:4": 3 / 4, "9:16": 9 / 16 };
+
+function ketajaman(a) {
+  const r = RASIO_ANGKA[a.crop ?? "asli"];
+  const w = r ? Math.min(a.width, a.height * r) : a.width;
+  const kali = LEBAR_TAMPIL / w;
+  if (kali <= 1) return { teks: `tajam (${Math.round(w)}px)`, kelas: "" };
+  const label = `${kali.toFixed(1)}x diperbesar`;
+  if (kali <= 2) return { teks: label, kelas: "" };
+  if (kali <= 3.5) return { teks: `${label}, agak lembut`, kelas: "lembut" };
+  return { teks: `${label}, hasilnya lembut`, kelas: "lembut" };
+}
+
 function cropCtl(a) {
   const c = a.crop ?? "asli";
   const p = a.crop_pos ?? "tengah";
@@ -306,7 +323,9 @@ function assetCard(a) {
       <div class="asset-info">
         <div class="asset-name">${esc(a.name)}</div>
         <div class="asset-meta">${isVideo ? `klip ${a.duration}s` : "gambar"}
-          &middot; ${a.width}x${a.height}</div>
+          &middot; ${a.width}x${a.height}
+          &middot; <span id="tajam-${esc(a.id)}" class="${ketajaman(a).kelas}"
+                        >${ketajaman(a).teks}</span></div>
       </div>
       <button type="button" class="link-btn" data-asset="${esc(a.id)}">Hapus</button>
     </div>
@@ -426,6 +445,11 @@ $("assetList").addEventListener("click", (e) => {
   [...grup.querySelectorAll(".chip")].forEach((b) => b.classList.remove("aktif"));
   e.target.classList.add("aktif");
   $(`croppos-${id}`).classList.toggle("redup", (a.crop ?? "asli") === "asli");
+
+  const t = ketajaman(a);
+  const tEl = $(`tajam-${id}`);
+  tEl.textContent = t.teks;
+  tEl.className = t.kelas;
 
   if (a.kind === "video") {
     jadwalkanFrame(a, "start");

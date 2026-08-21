@@ -400,3 +400,5 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
   border-color: var(--accent);
   font-weight: 600;
 }
+
+.asset-meta .lembut { color: var(--warn); }

@@ -135,6 +135,22 @@ sebelum videonya dibuat. Potongan ini diterapkan lebih dulu, baru gambarnya
 dipasang ke tata letak - jadi latar buramnya juga memakai bagian yang sudah
 dipotong.
 
+**Memotong tidak menambah ketajaman, justru menguranginya.** Produk dipasang
+selebar sekitar 982px di video 1080x1920, jadi apa pun yang lebih kecil harus
+diperbesar - dan memotong berarti membuang piksel yang tersisa. Contoh nyata
+dari tangkapan layar 606x272:
+
+| Potong | Sisa lebar | Perbesaran |
+|---|---|---|
+| Asli | 606px | 1,6x |
+| 1:1 | 272px | 3,6x |
+| 3:4 | 204px | 4,8x |
+| 9:16 | 153px | 6,4x |
+
+Angka perbesarannya ditampilkan di kartu aset dan ikut berubah tiap kali
+rasionya diganti. Di atas 3,5x tulisannya berubah kuning - masih bisa dipakai,
+tapi hasilnya akan kelihatan lembut.
+
 ## Kapan tautan produk dibuka
 
 Halaman produk **hanya dibuka kalau ada yang benar-benar dibutuhkan** darinya:
@@ -623,8 +639,12 @@ menuliskannya, contoh: `suara id-ID-ArdiNeural (pria via edge)`.
 ### `Berkas ini bukan gambar atau video yang bisa dibaca`
 Format tidak dikenali FFmpeg, atau berkasnya rusak.
 
-### `Ukuran ... terlalu kecil, minimal 320px`
-Unggah gambar beresolusi lebih besar.
+### `Ukuran ... terlalu kecil. Sisi terpanjang minimal 480px ...`
+Batasnya diukur dari **sisi terpanjang**, bukan sisi terpendek - potongan
+tangkapan layar sering pendek di satu sisi (misalnya 606x272) tapi tetap layak
+dipakai. Yang ditolak cuma yang benar-benar kecil seperti ikon, atau gambar
+setipis garis.
+**Solusi:** ambil ulang tangkapan layarnya dengan area yang lebih lebar.
 
 ### Video hasil terasa terlalu panjang atau pendek dari target
 Wajar, meleset sekitar 10%. Durasi ditentukan panjang narasi yang tidak bisa

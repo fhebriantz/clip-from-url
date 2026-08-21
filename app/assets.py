@@ -22,7 +22,18 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 # Codec yang berarti berkasnya gambar diam, bukan video.
 _STILL_CODECS = {"mjpeg", "png", "webp", "bmp", "tiff", "jpeg2000"}
 MAX_BYTES = 200 * 1024 * 1024
-MIN_PX = 320
+
+# Ukuran minimum diukur dari sisi terpanjang, bukan sisi terpendek. Potongan
+# tangkapan layar sering pendek di satu sisi - 606x272 misalnya - tapi tetap
+# tajam saat dipasang ke video, karena yang menentukan seberapa jauh gambar
+# diperbesar adalah sisi panjangnya. Sisi pendek tetap dijaga seadanya supaya
+# gambar setipis garis tidak lolos.
+MIN_SISI_PANJANG = 480
+MIN_SISI_PENDEK = 120
+
+# Di bawah ini gambar masih diterima tapi harus diperbesar cukup jauh, jadi
+# hasilnya kelihatan lembut. Dipakai untuk memberi tahu, bukan menolak.
+LEMBUT_DI_BAWAH = 900
 
 # Tangkapan layar biasanya memuat bilah status, tombol, dan bagian antarmuka lain
 # yang tidak perlu ikut masuk video. Rasio dan posisi crop diatur sendiri karena
@@ -89,8 +100,11 @@ def probe(path: Path) -> tuple[str, int, int, float]:
         raise ValueError("Berkas ini bukan gambar atau video yang bisa dibaca.")
     st = streams[0]
     w, h = int(st.get("width") or 0), int(st.get("height") or 0)
-    if min(w, h) < MIN_PX:
-        raise ValueError(f"Ukuran {w}x{h} terlalu kecil, minimal {MIN_PX}px.")
+    if max(w, h) < MIN_SISI_PANJANG or min(w, h) < MIN_SISI_PENDEK:
+        raise ValueError(
+            f"Ukuran {w}x{h} terlalu kecil. Sisi terpanjang minimal "
+            f"{MIN_SISI_PANJANG}px dan sisi terpendek minimal {MIN_SISI_PENDEK}px."
+        )
     try:
         duration = float((data.get("format") or {}).get("duration") or 0)
     except (TypeError, ValueError):
