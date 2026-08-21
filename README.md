@@ -77,13 +77,63 @@ supaya nyaman dipakai dari layar HP.
 | **URL produk** | tidak, kalau Nama produk dan aset diisi | Shopee, Tokopedia, atau tautan share TikTok Shop |
 | **Nama produk** | tidak | Biasanya terbaca sendiri dari alamatnya |
 | **Harga** | tidak | Isi `59000` atau `Rp59.000`. Wajib untuk TikTok Shop |
-| **Aset sendiri** | tidak | Gambar atau klip video. Klip punya slider trim |
+| **Aset sendiri** | tidak | Gambar atau klip video. Klip punya slider trim, semuanya punya pengaturan potong |
 | **Deskripsi sendiri** | tidak | Kalau diisi, menggantikan deskripsi dari halaman |
+| **Baca dari tangkapan layar** | tidak | Screenshot deskripsi produk, teksnya diketik ulang oleh AI |
 | **Target durasi** | ya | 15-60 detik |
 | **Suara narator** | ya | Acak, atau kunci ke satu suara |
 | **Model naskah / suara** | ya | Sudah terisi rekomendasi |
 | **Kartu hook** | - | Teks besar pembuka, sebaiknya dibiarkan aktif |
 | **Pakai suara narasi** | - | Matikan untuk hemat kuota TTS - naskahnya tetap ditulis di `.txt` |
+
+### Menempel tangkapan layar (Ctrl+V)
+
+Hasil **Win+Shift+S** di Windows atau **PrtSc** di Linux hanya duduk di papan
+klip - tidak ada berkas yang bisa dipilih lewat tombol *Browse*. Karena itu
+halaman ini menerima tempelan langsung:
+
+- **Ctrl+V di mana saja** - tangkapan layarnya diunggah sebagai aset.
+- **Ctrl+V setelah mengklik kolom Deskripsi sendiri** - tangkapan layarnya
+  dibaca sebagai teks dan hasilnya ditambahkan ke kolom itu.
+
+Menempel teks biasa di kolom deskripsi tetap berjalan normal.
+
+### Membaca deskripsi dari tangkapan layar
+
+Deskripsi produk di aplikasi Shopee/Tokopedia sering tidak bisa disalin. Jalan
+pintasnya: screenshot bagian deskripsinya, lalu unggah atau tempel di kolom
+**Baca dari tangkapan layar**. Teksnya diketik ulang oleh AI dan **ditambahkan**
+ke kolom deskripsi, bukan menimpa isinya.
+
+Dua hal yang perlu diingat:
+
+- **Periksa hasilnya dulu.** Pembacaan bisa meleset, dan naskah akan memercayai
+  apa pun yang ada di kolom deskripsi.
+- **Satu pembacaan = satu permintaan kuota.** Tangkapan layar yang sama persis
+  dibaca dari simpanan dan tidak memakai kuota lagi.
+
+Batasnya 12 MB per gambar, dan berkasnya harus benar-benar gambar.
+
+### Mengatur potongan aset
+
+Tangkapan layar biasanya ikut memuat bilah status, tombol, dan bagian antarmuka
+lain yang tidak perlu masuk video. Tiap aset punya baris **Potong**:
+
+| Pilihan | Hasil |
+|---|---|
+| **Asli** | Tidak dipotong sama sekali |
+| **1:1** | Kotak |
+| **3:4** | Potret, cocok untuk foto produk |
+| **9:16** | Potret penuh, sama seperti rasio videonya |
+
+Baris **Bagian** menentukan sisi mana yang diambil - **Atas**, **Tengah**, atau
+**Bawah** - karena bagian yang ingin dipakai tidak selalu ada di tengah.
+Pilihan ini mati saat rasionya masih *Asli*.
+
+Pratinjaunya ikut berubah begitu diklik, jadi hasil potongnya bisa dilihat
+sebelum videonya dibuat. Potongan ini diterapkan lebih dulu, baru gambarnya
+dipasang ke tata letak - jadi latar buramnya juga memakai bagian yang sudah
+dipotong.
 
 ## Kapan tautan produk dibuka
 

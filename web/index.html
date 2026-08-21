@@ -33,6 +33,9 @@
       <label>Aset sendiri <span class="opt">gambar atau klip video</span>
         <input id="pFiles" type="file" accept="image/*,video/*" multiple>
       </label>
+      <div class="petunjuk">Habis <b>Win+Shift+S</b> atau <b>PrtSc</b>? Tekan
+        <b>Ctrl+V</b> di halaman ini - tangkapan layarnya langsung terunggah
+        tanpa perlu disimpan dulu.</div>
       <div id="petunjukTiktok" class="petunjuk" hidden></div>
       <div id="assetList" class="assets"></div>
 
@@ -51,9 +54,16 @@
         </label>
 
         <label>Deskripsi sendiri <span class="opt">menggantikan deskripsi dari halaman</span>
-          <textarea id="pDesc" rows="3"
+          <textarea id="pDesc" rows="4"
                     placeholder="Tulis apa yang kamu tahu soal produknya."></textarea>
         </label>
+        <label class="baca-ss">Baca dari tangkapan layar
+          <span class="opt">unggah screenshot deskripsi produk, teksnya diketik ulang otomatis</span>
+          <input id="pOcr" type="file" accept="image/*">
+        </label>
+        <div class="petunjuk">Atau klik dulu kolom deskripsi di atas, lalu
+          <b>Ctrl+V</b> - tangkapan layar di papan klip akan dibaca ke situ.</div>
+        <div id="ocrStatus" class="petunjuk" hidden></div>
 
         <div class="row">
           <label>Durasi (detik)

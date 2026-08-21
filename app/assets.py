@@ -24,6 +24,21 @@ _STILL_CODECS = {"mjpeg", "png", "webp", "bmp", "tiff", "jpeg2000"}
 MAX_BYTES = 200 * 1024 * 1024
 MIN_PX = 320
 
+# Tangkapan layar biasanya memuat bilah status, tombol, dan bagian antarmuka lain
+# yang tidak perlu ikut masuk video. Rasio dan posisi crop diatur sendiri karena
+# bagian yang ingin dipakai tidak selalu di tengah.
+RASIO_CROP = {"asli": None, "1:1": 1.0, "3:4": 3 / 4, "9:16": 9 / 16}
+POSISI_CROP = ("atas", "tengah", "bawah")
+
+
+def crop_filter(rasio: str, posisi: str) -> str:
+    """Filter FFmpeg untuk memotong sumber ke rasio tertentu, atau string kosong."""
+    r = RASIO_CROP.get(rasio)
+    if not r:
+        return ""
+    y = {"atas": "0", "bawah": "ih-oh"}.get(posisi, "(ih-oh)/2")
+    return f"crop='min(iw,ih*{r})':'min(ih,iw/{r})':'(iw-ow)/2':'{y}'"
+
 
 @dataclass
 class Asset:
@@ -35,6 +50,8 @@ class Asset:
     duration: float    # 0 untuk gambar
     trim_start: float = 0.0
     trim_end: float = 0.0   # 0 berarti sampai akhir klip
+    crop: str = "asli"      # asli | 1:1 | 3:4 | 9:16
+    crop_pos: str = "tengah"  # atas | tengah | bawah
 
     @property
     def usable(self) -> float:
@@ -106,7 +123,7 @@ def make_preview(asset: Asset) -> None:
     ])
 
 
-def frame_at(asset: Asset, t: float) -> Path:
+def frame_at(asset: Asset, t: float, rasio: str = "asli", posisi: str = "tengah") -> Path:
     """Ambil satu frame pada detik `t`, dipakai untuk pratinjau slider trim.
 
     Lebih andal daripada mengandalkan pemutaran video di browser: rekaman HEVC
@@ -116,13 +133,16 @@ def frame_at(asset: Asset, t: float) -> Path:
     """
     t = max(0.0, min(t, max(0.0, asset.duration - 0.05)))
     key = int(round(t * 10)) * 100  # dibulatkan ke 0,1 detik
-    out = asset.path.parent / f"frame-{key:07d}.jpg"
+    tanda = f"{rasio.replace(':', 'x')}-{posisi}"
+    out = asset.path.parent / f"frame-{key:07d}-{tanda}.jpg"
     if out.is_file():
         return out
     src = preview_path(asset.id)
+    potong = crop_filter(rasio, posisi)
+    vf = f"{potong},scale=-2:360" if potong else "scale=-2:360"
     run_ffmpeg([
         "-ss", f"{t:.3f}", "-i", str(src if src.is_file() else asset.path),
-        "-frames:v", "1", "-q:v", "5", "-vf", "scale=-2:360", str(out),
+        "-frames:v", "1", "-q:v", "5", "-vf", vf, str(out),
     ])
     return out
 
@@ -172,13 +192,18 @@ def load(asset_id: str) -> Asset | None:
 
 
 def load_many(refs: list[dict]) -> list[Asset]:
-    """Muat aset beserta batas trim-nya. `refs` berisi {id, start, end}."""
+    """Muat aset beserta batas trim dan crop-nya. `refs` berisi {id, start, end, crop, crop_pos}."""
     out: list[Asset] = []
     for ref in refs:
         asset_id = ref["id"] if isinstance(ref, dict) else str(ref)
         asset = load(asset_id)
         if asset is None:
             raise ValueError(f"Aset tidak ditemukan: {asset_id}")
+        if isinstance(ref, dict):
+            r = str(ref.get("crop") or "asli")
+            asset.crop = r if r in RASIO_CROP else "asli"
+            pos = str(ref.get("crop_pos") or "tengah")
+            asset.crop_pos = pos if pos in POSISI_CROP else "tengah"
         if isinstance(ref, dict) and asset.kind == "video":
             asset.trim_start = max(0.0, min(float(ref.get("start") or 0), asset.duration))
             end = float(ref.get("end") or 0)

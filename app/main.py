@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import re
 import secrets
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
@@ -83,6 +84,8 @@ class AssetRef(BaseModel):
     id: str
     start: float = Field(default=0.0, ge=0, le=3600)
     end: float = Field(default=0.0, ge=0, le=3600)
+    crop: Literal["asli", "1:1", "3:4", "9:16"] = "asli"
+    crop_pos: Literal["atas", "tengah", "bawah"] = "tengah"
 
     @field_validator("id")
     @classmethod
@@ -230,14 +233,17 @@ def asset_preview(asset_id: str) -> FileResponse:
 
 
 @app.get("/api/assets/{asset_id}/frame")
-def asset_frame(asset_id: str, t: float = 0.0) -> FileResponse:
-    """Satu frame pada detik tertentu, untuk pratinjau slider trim."""
+def asset_frame(asset_id: str, t: float = 0.0, crop: str = "asli",
+                pos: str = "tengah") -> FileResponse:
+    """Satu frame pada detik tertentu, untuk pratinjau trim dan crop."""
     a = assets.load(asset_id)
     if not a:
         raise HTTPException(404, "Aset tidak ditemukan")
-    if a.kind != "video":
+    if crop not in assets.RASIO_CROP or pos not in assets.POSISI_CROP:
+        raise HTTPException(400, "Rasio atau posisi crop tidak dikenal.")
+    if a.kind != "video" and crop == "asli":
         return FileResponse(a.path)
-    return FileResponse(assets.frame_at(a, t), media_type="image/jpeg")
+    return FileResponse(assets.frame_at(a, t, crop, pos), media_type="image/jpeg")
 
 
 @app.get("/api/assets/{asset_id}/file")
@@ -262,6 +268,32 @@ def assets_cleanup() -> dict[str, Any]:
         "mb": round(hasil["bytes"] / 1024 / 1024, 2),
         "frame_dirapikan": hasil["frame_dirapikan"],
     }
+
+
+@app.post("/api/ocr")
+async def ocr_deskripsi(file: UploadFile) -> dict[str, Any]:
+    """Baca deskripsi produk dari tangkapan layar.
+
+    Hasilnya disimpan berdasarkan isi gambar, jadi membaca ulang tangkapan yang
+    sama tidak memakai kuota lagi.
+    """
+    blob = await file.read()
+    if len(blob) > 12 * 1024 * 1024:
+        raise HTTPException(400, "Gambar lebih dari 12 MB.")
+    kunci = "ocr:" + hashlib.sha256(blob).hexdigest()[:32]
+    tersimpan = db.cache_ambil(kunci)
+    if tersimpan is not None:
+        return {"teks": tersimpan, "dari_simpanan": True}
+
+    mime = file.content_type or "image/png"
+    if not mime.startswith("image/"):
+        raise HTTPException(400, "Berkas harus berupa gambar.")
+    try:
+        teks = gemini_service.baca_tangkapan_layar(blob, mime)
+    except Exception as exc:  # noqa: BLE001 - pesan mentah tidak ramah
+        raise HTTPException(502, f"Gagal membaca tangkapan layar: {str(exc)[:150]}") from exc
+    db.cache_simpan(kunci, "ocr", teks)
+    return {"teks": teks, "dari_simpanan": False}
 
 
 @app.get("/api/models")

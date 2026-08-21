@@ -352,3 +352,51 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
 }
 .petunjuk[hidden] { display: none; }
 .petunjuk b { color: var(--warn); }
+
+.baca-ss { border-top: 1px dashed var(--border); padding-top: 14px; }
+
+/* ------------------------------------------------------------ crop aset */
+.crop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.crop-baris {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  transition: opacity .15s ease;
+}
+
+.crop-baris.redup { opacity: .38; pointer-events: none; }
+
+.crop-lbl {
+  min-width: 58px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chip {
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.chip:hover { border-color: var(--accent); }
+
+.chip.aktif {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}

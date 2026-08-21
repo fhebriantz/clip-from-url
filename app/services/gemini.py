@@ -295,3 +295,55 @@ def _clean_script(data: dict, wanted: int, vague: str = "", exact: int | None = 
         "post_caption": _scrub_price(str(data.get("post_caption") or "").strip(), vague, exact),
         "hashtags": [str(h).lstrip("#").strip() for h in (data.get("hashtags") or []) if str(h).strip()][:12],
     }
+
+
+# ------------------------------------------------------------ baca tangkapan layar
+
+_OCR_PROMPT = """Ini tangkapan layar halaman produk dari marketplace.
+
+Salin ULANG teks deskripsi produknya apa adanya dalam Bahasa Indonesia.
+
+- Abaikan elemen antarmuka: jam, sinyal, baterai, tombol, menu, harga coret,
+  jumlah terjual, ulasan, dan tombol beli.
+- Jangan menambah, menyimpulkan, atau merapikan apa pun. Kalau ada bagian yang
+  tidak terbaca, lewati saja - jangan ditebak.
+- Pertahankan urutan dan pemisahan barisnya.
+- Keluarkan teks polos saja, tanpa penjelasan dan tanpa tanda kutip pembungkus."""
+
+
+def baca_tangkapan_layar(gambar: bytes, mime: str = "image/png") -> str:
+    """Ambil teks deskripsi produk dari sebuah tangkapan layar.
+
+    Berguna karena deskripsi di aplikasi marketplace sering tidak bisa disalin,
+    dan TikTok Shop tidak menyediakannya sama sekali lewat tautan.
+    """
+    client = _client()
+    last: Exception | None = None
+    for model in _model_chain():
+        delay = 5.0
+        for attempt in range(1, _ATTEMPTS_PER_MODEL + 1):
+            try:
+                resp = client.models.generate_content(
+                    model=model,
+                    contents=[types.Part.from_bytes(data=gambar, mime_type=mime), _OCR_PROMPT],
+                    config=_script_config_teks(),
+                )
+                _record(model, resp)
+                return (resp.text or "").strip()
+            except (genai_errors.ServerError, genai_errors.ClientError) as exc:
+                last = exc
+                code = getattr(exc, "code", None)
+                usage.record("naskah", model, 0, 0, ok=False, note=str(exc))
+                if code == 429 or code not in _RETRY_CODES or attempt == _ATTEMPTS_PER_MODEL:
+                    break
+                time.sleep(delay)
+                delay = min(delay * 2, 30.0)
+    raise RuntimeError(f"Gagal membaca tangkapan layar. Terakhir: {last}")
+
+
+def _script_config_teks() -> types.GenerateContentConfig:
+    """Seperti config naskah, tapi keluarannya teks biasa - bukan JSON."""
+    kwargs: dict = {"temperature": 0.1}
+    if GEMINI_THINKING and GEMINI_THINKING != "default":
+        kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=GEMINI_THINKING)
+    return types.GenerateContentConfig(**kwargs)

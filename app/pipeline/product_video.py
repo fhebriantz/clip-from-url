@@ -189,43 +189,48 @@ def _zoom_expr(duration: float, idx: int) -> str:
     return f"z='{1 + ZOOM_RANGE}-{ZOOM_RANGE}*on/{frames}'"
 
 
-def _layout_chain(layout: str) -> tuple[list[str], dict]:
+def _layout_chain(layout: str, potong: str = "") -> tuple[list[str], dict]:
     """Rantai filter latar + gaya subtitle untuk satu tata letak.
 
     Semua tata letak dirancang tetap aman untuk foto produk kotak berlatar putih,
     yang paling umum di marketplace.
     """
+    # Label keluaran filter hanya boleh dipakai sekali, sedangkan latar dan
+    # produk sama-sama butuh sumber yang sudah dipotong - jadi dipecah dua.
+    bg, fg = ("[cr0]", "[cr1]") if potong else ("[0:v]", "[0:v]")
+    awal = [f"[0:v]{potong},split=2[cr0][cr1]"] if potong else []
+
     if layout == "terang-tengah":
         # Latar hanya dinaikkan sedikit: kalau terlalu putih, foto produk yang
         # juga berlatar putih kehilangan tepinya. Subtitle memakai kotak kuning
         # supaya tetap kontras di atas latar terang.
-        return ([
-            f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+        return (awal + [
+            f"{bg}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
             "boxblur=40:3,eq=brightness=0.08:saturation=0.45[bg]",
-            f"[0:v]scale={int(W * 0.84)}:-1[fg]",
+            f"{fg}scale={int(W * 0.84)}:-1[fg]",
             "[bg][fg]overlay=(W-w)/2:(H-h)/2-90[base]",
         ], {"fontcolor": "black", "boxcolor": "0xFFD400@0.95", "y": "h-text_h-330"})
 
     if layout == "panel-bawah":
-        return ([
-            f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+        return (awal + [
+            f"{bg}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
             "boxblur=34:2,eq=brightness=-0.28:saturation=0.7[bg]",
-            f"[0:v]scale={int(W * 0.88)}:-1[fg]",
+            f"{fg}scale={int(W * 0.88)}:-1[fg]",
             "[bg][fg]overlay=(W-w)/2:(H-h)/2-210[base]",
         ], {"fontcolor": "white", "boxcolor": "black@0.72", "y": "h-text_h-260"})
 
-    return ([
-        f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+    return (awal + [
+        f"{bg}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
         "boxblur=30:2,eq=brightness=-0.10[bg]",
-        f"[0:v]scale={int(W * 0.91)}:-1[fg]",
+        f"{fg}scale={int(W * 0.91)}:-1[fg]",
         "[bg][fg]overlay=(W-w)/2:(H-h)/2[base]",
     ], {"fontcolor": "white", "boxcolor": "black@0.55", "y": "h-text_h-360"})
 
 
 def _render_scene(image: Path, duration: float, caption: str, out: Path, work: Path,
-                  idx: int, layout: str = "blur-tengah") -> None:
+                  idx: int, layout: str = "blur-tengah", potong: str = "") -> None:
     """Satu scene: latar sesuai tata letak, produk, zoom pelan, subtitle."""
-    chain, style = _layout_chain(layout)
+    chain, style = _layout_chain(layout, potong)
     chain.append(
         f"[base]zoompan={_zoom_expr(duration, idx)}:d=1:"
         f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={W}x{H}:fps={FPS}[zm]"
@@ -287,7 +292,7 @@ def _still_of(asset, work: Path) -> Path:
 
 
 def _render_clip(asset, duration: float, caption: str, out: Path, work: Path,
-                 idx: int, layout: str = "blur-tengah") -> None:
+                 idx: int, layout: str = "blur-tengah", potong: str = "") -> None:
     """Satu scene dari klip video yang diunggah pengguna.
 
     Klip dipotong dari `trim_start` sepanjang durasi narasi. Kalau klipnya lebih
@@ -295,7 +300,7 @@ def _render_clip(asset, duration: float, caption: str, out: Path, work: Path,
     karena tidak pernah terlihat aneh, tidak seperti loop pendek atau gerak
     lambat. Audio bawaan klip selalu dibuang; hanya narasi yang terdengar.
     """
-    chain, style = _layout_chain(layout)
+    chain, style = _layout_chain(layout, potong)
     # Klip sudah bergerak sendiri, jadi tidak perlu Ken Burns - cukup rapikan
     # ke 9:16 lalu bekukan sisanya kalau kurang panjang.
     chain.append(
@@ -603,12 +608,14 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
             return i
         j = i - offset
         asset = media[j % len(media)]
+        potong = assets.crop_filter(asset.crop, asset.crop_pos)
         if asset.kind == "video":
             _render_clip(asset, durations[i] + pads[i], scenes[j]["caption"],
-                         clips[i], work, j, layout=layout)
+                         clips[i], work, j, layout=layout, potong=potong)
         else:
             _render_scene(asset.path, durations[i] + pads[i],
-                          scenes[j]["caption"], clips[i], work, j, layout=layout)
+                          scenes[j]["caption"], clips[i], work, j, layout=layout,
+                          potong=potong)
         return i
 
     done = 0

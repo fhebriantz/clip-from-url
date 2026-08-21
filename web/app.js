@@ -91,6 +91,36 @@ $("jobs").addEventListener("click", async (e) => {
   await fetch(`/api/jobs/${id}`, { method: "DELETE" });
 });
 
+/* ------------------------------------------- baca deskripsi dari tangkapan */
+
+async function bacaTangkapan(f) {
+  if (!f) return;
+  const el = $("ocrStatus");
+  el.hidden = false;
+  el.textContent = "Membaca tangkapan layar...";
+  const fd = new FormData();
+  fd.append("file", f);
+  try {
+    const res = await fetch("/api/ocr", { method: "POST", body: fd });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || "Gagal membaca");
+    const desc = $("pDesc");
+    // Ditambahkan, bukan menimpa - kamu mungkin sudah menulis sesuatu sendiri.
+    desc.value = desc.value.trim() ? `${desc.value.trim()}\n${body.teks}` : body.teks;
+    el.innerHTML = body.dari_simpanan
+      ? "Terbaca dari simpanan, tanpa memakai kuota. Periksa dan rapikan kalau perlu."
+      : "Terbaca. <b>Periksa dulu</b> - hasil pembacaan bisa meleset, dan naskah "
+        + "akan memercayai apa pun yang ada di kolom ini.";
+  } catch (err) {
+    el.textContent = err.message;
+  }
+}
+
+$("pOcr").addEventListener("change", async (e) => {
+  await bacaTangkapan(e.target.files[0]);
+  e.target.value = "";
+});
+
 /* --------------------------------------------------- petunjuk TikTok Shop */
 
 // TikTok Shop tidak menyediakan deskripsi produk sama sekali, jadi naskah hanya
@@ -212,6 +242,33 @@ function fmtDetik(v) {
   return `${Number(v).toFixed(1)}s`;
 }
 
+const RASIO = [["asli", "Asli"], ["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"]];
+const POSISI = [["atas", "Atas"], ["tengah", "Tengah"], ["bawah", "Bawah"]];
+
+function frameUrl(a, t) {
+  const c = a.crop ?? "asli";
+  const p = a.crop_pos ?? "tengah";
+  // Cap waktu ikut disertakan supaya browser tidak menyajikan pratinjau lama
+  // dari cache saat rasio crop diganti.
+  return `/api/assets/${a.id}/frame?t=${Number(t).toFixed(1)}`
+    + `&crop=${encodeURIComponent(c)}&pos=${p}&v=${a.rev ?? 0}`;
+}
+
+function cropCtl(a) {
+  const c = a.crop ?? "asli";
+  const p = a.crop_pos ?? "tengah";
+  const btn = ([v, l]) => `<button type="button" data-crop="${v}" data-id="${esc(a.id)}"
+    class="chip${v === c ? " aktif" : ""}">${l}</button>`;
+  const pos = ([v, l]) => `<button type="button" data-croppos="${v}" data-id="${esc(a.id)}"
+    class="chip${v === p ? " aktif" : ""}">${l}</button>`;
+  return `<div class="crop">
+    <div class="crop-baris"><span class="crop-lbl">Potong</span>
+      ${RASIO.map(btn).join("")}</div>
+    <div class="crop-baris${c === "asli" ? " redup" : ""}" id="croppos-${esc(a.id)}">
+      <span class="crop-lbl">Bagian</span>${POSISI.map(pos).join("")}</div>
+  </div>`;
+}
+
 function assetCard(a) {
   const isVideo = a.kind === "video";
   // Pratinjau memakai frame diam, bukan pemutaran video: rekaman HEVC/MOV dari
@@ -220,11 +277,11 @@ function assetCard(a) {
     <div class="trim">
       <div class="trim-frames">
         <figure>
-          <img id="img-start-${esc(a.id)}" src="/api/assets/${esc(a.id)}/frame?t=${a.start}" alt="">
+          <img id="img-start-${esc(a.id)}" src="${frameUrl(a, a.start)}" alt="">
           <figcaption>mulai <span id="lbl-start-${esc(a.id)}">${fmtDetik(a.start)}</span></figcaption>
         </figure>
         <figure>
-          <img id="img-end-${esc(a.id)}" src="/api/assets/${esc(a.id)}/frame?t=${Math.max(0, a.end - 0.1)}" alt="">
+          <img id="img-end-${esc(a.id)}" src="${frameUrl(a, Math.max(0, a.end - 0.1))}" alt="">
           <figcaption>selesai <span id="lbl-end-${esc(a.id)}">${fmtDetik(a.end)}</span></figcaption>
         </figure>
       </div>
@@ -245,7 +302,7 @@ function assetCard(a) {
     <div class="asset-head">
       ${isVideo
         ? `<video src="/api/assets/${esc(a.id)}/preview" muted preload="metadata"></video>`
-        : `<img src="/api/assets/${esc(a.id)}/file" alt="">`}
+        : `<img id="thumb-${esc(a.id)}" src="${frameUrl(a, 0)}" alt="">`}
       <div class="asset-info">
         <div class="asset-name">${esc(a.name)}</div>
         <div class="asset-meta">${isVideo ? `klip ${a.duration}s` : "gambar"}
@@ -253,6 +310,7 @@ function assetCard(a) {
       </div>
       <button type="button" class="link-btn" data-asset="${esc(a.id)}">Hapus</button>
     </div>
+    ${cropCtl(a)}
     ${trim}
   </div>`;
 }
@@ -296,12 +354,11 @@ function jadwalkanFrame(a, which) {
   FRAME_TIMER[key] = setTimeout(() => {
     const t = which === "start" ? a.start : Math.max(0, a.end - 0.1);
     const img = $(`img-${which}-${a.id}`);
-    if (img) img.src = `/api/assets/${a.id}/frame?t=${t.toFixed(1)}`;
+    if (img) img.src = frameUrl(a, t);
   }, 130);
 }
 
-$("pFiles").addEventListener("change", async (e) => {
-  const files = [...e.target.files];
+async function unggahAset(files) {
   if (!files.length) return;
   const errEl = document.querySelector('[data-err="product"]');
   errEl.textContent = "Mengunggah...";
@@ -312,13 +369,69 @@ $("pFiles").addEventListener("change", async (e) => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.detail || "Upload gagal");
     // Nilai trim awal: klip utuh.
-    ASSETS = ASSETS.concat(body.map((a) => ({ ...a, start: 0, end: a.duration })));
+    ASSETS = ASSETS.concat(body.map((a) => ({
+      ...a, start: 0, end: a.duration, crop: "asli", crop_pos: "tengah", rev: 0,
+    })));
     renderAssets();
     errEl.textContent = "";
   } catch (err) {
     errEl.textContent = err.message;
-  } finally {
-    e.target.value = "";
+  }
+}
+
+$("pFiles").addEventListener("change", async (e) => {
+  await unggahAset([...e.target.files]);
+  e.target.value = "";
+});
+
+// Tangkapan layar dari Win+Shift+S atau PrtSc hanya ada di papan klip - tidak
+// ada berkasnya untuk dipilih. Tempel (Ctrl+V) langsung mengunggahnya.
+function gambarDitempel(e) {
+  return [...(e.clipboardData?.items || [])]
+    .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+    .map((it) => it.getAsFile())
+    .filter(Boolean);
+}
+
+// Menempel di kolom deskripsi berarti "bacakan tulisannya", bukan "pakai jadi
+// aset". Penanganannya dipasang di kolomnya sendiri, bukan lewat pemeriksaan
+// document.activeElement - kolom ini ada di dalam <details> yang bisa tertutup,
+// dan fokus tidak selalu mendarat di sana.
+$("pDesc").addEventListener("paste", (e) => {
+  const gambar = gambarDitempel(e);
+  if (!gambar.length) return;   // tempel teks biasa dibiarkan apa adanya
+  e.preventDefault();
+  e.stopPropagation();          // supaya tidak ikut terunggah jadi aset
+  bacaTangkapan(gambar[0]);
+});
+
+document.addEventListener("paste", (e) => {
+  const gambar = gambarDitempel(e);
+  if (!gambar.length) return;
+  e.preventDefault();
+  unggahAset(gambar);
+});
+
+$("assetList").addEventListener("click", (e) => {
+  const d = e.target.dataset || {};
+  const id = d.id;
+  if (!id || (d.crop === undefined && d.croppos === undefined)) return;
+  const a = ASSETS.find((x) => x.id === id);
+  if (!a) return;
+  if (d.crop !== undefined) a.crop = d.crop;
+  else a.crop_pos = d.croppos;
+  a.rev = (a.rev ?? 0) + 1;
+
+  const grup = e.target.parentElement;
+  [...grup.querySelectorAll(".chip")].forEach((b) => b.classList.remove("aktif"));
+  e.target.classList.add("aktif");
+  $(`croppos-${id}`).classList.toggle("redup", (a.crop ?? "asli") === "asli");
+
+  if (a.kind === "video") {
+    jadwalkanFrame(a, "start");
+    jadwalkanFrame(a, "end");
+  } else {
+    $(`thumb-${id}`).src = frameUrl(a, 0);
   }
 });
 
@@ -423,7 +536,10 @@ $("formProduct").addEventListener("submit", (e) => {
     price_text: $("pPrice").value.trim(),
     script_model: $("pScriptModel").value,
     tts_model: $("pTtsModel").value,
-    assets: ASSETS.map((a) => ({ id: a.id, start: a.start ?? 0, end: a.end ?? 0 })),
+    assets: ASSETS.map((a) => ({
+      id: a.id, start: a.start ?? 0, end: a.end ?? 0,
+      crop: a.crop ?? "asli", crop_pos: a.crop_pos ?? "tengah",
+    })),
     description: $("pDesc").value.trim(),
   }, "product");
 });
