@@ -504,15 +504,17 @@ function cropCtl(a) {
   // Gambar sumbernya utuh; yang menentukan bagian mana yang terlihat adalah
   // ukuran dan posisinya di dalam panggung, diatur lewat gaya inline.
   const sumber = a.kind === "video" ? frameUrl(a, a.start) : `/api/assets/${a.id}/file`;
-  // Hanya gambar yang bisa jadi sampul; mengambil frame dari klip butuh langkah
-  // tambahan dan hasilnya jarang sebagus foto produk yang dipilih sendiri.
-  const sampul = a.kind === "image" ? `
+  // Klip memakai frame di titik mulai potongannya, jadi menggeser slider "Titik
+  // mulai" sekaligus memilih gambar sampulnya.
+  const sampul = `
     <div class="crop-baris">
       <span class="crop-lbl">Sampul</span>
       <button type="button" data-thumb="${esc(a.id)}"
               class="chip${a.thumb ? " aktif" : ""}">
         ${a.thumb ? "Dipakai jadi sampul" : "Pilih untuk sampul"}</button>
-    </div>` : "";
+      ${a.kind === "video"
+        ? '<span class="crop-nota">pakai frame di titik mulai</span>' : ""}
+    </div>`;
   return `<div class="crop">
     <div class="crop-baris"><span class="crop-lbl">Potong</span>
       ${RASIO.map(btn).join("")}</div>
@@ -683,7 +685,7 @@ async function unggahAset(files) {
     // Kalau belum ada yang dipilih, gambar pertama dipakai supaya sampulnya
     // tetap terbuat tanpa perlu diklik dulu.
     if (!ASSETS.some((a) => a.thumb)) {
-      const g = ASSETS.find((a) => a.kind === "image");
+      const g = ASSETS.find((a) => a.kind === "image") || ASSETS[0];
       if (g) g.thumb = true;
     }
     renderAssets();

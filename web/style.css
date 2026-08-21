@@ -551,3 +551,5 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
 }
 
 .ocr-diingat[hidden] { display: none; }
+
+.crop-nota { font-size: 11.5px; color: var(--muted); }

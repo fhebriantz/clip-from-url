@@ -78,7 +78,7 @@ supaya nyaman dipakai dari layar HP.
 | **URL produk** | tidak, kalau Nama produk dan aset diisi | Shopee, Tokopedia, atau tautan share TikTok Shop |
 | **Nama produk** | tidak | Biasanya terbaca sendiri dari alamatnya |
 | **Harga** | tidak | Isi `59000` atau `Rp59.000`. Wajib untuk TikTok Shop |
-| **Aset sendiri** | tidak | Gambar atau klip video. Klip punya slider trim; semuanya bisa dipotong dengan geser dan zoom, dan gambar bisa dipilih jadi sampul |
+| **Aset sendiri** | tidak | Gambar atau klip video. Klip punya slider trim; semuanya bisa dipotong dengan geser dan zoom, dan dipilih jadi sampul |
 | **Deskripsi sendiri** | tidak | Kalau diisi, menggantikan deskripsi dari halaman |
 | **Baca dari tangkapan layar** | tidak | Screenshot deskripsi produk, teksnya diketik ulang oleh AI |
 | **Target durasi** | ya | 15-60 detik |
@@ -208,10 +208,20 @@ Tiap video ikut menghasilkan satu berkas `.jpg` **3:4 tegak** (1080x1440) -
 rasio yang dipakai grid Instagram dan galeri TikTok, jadi tidak terpotong di
 feed.
 
-Sumbernya dipilih sendiri: di tiap aset **gambar** ada tombol **Pilih untuk
-sampul**, dan yang terpilih cuma satu. Kalau tidak dipilih apa pun, gambar
-pertama yang dipakai. Pengaturan zoom dan geser dari aset itu ikut terpakai,
-jadi bagian yang kamu bidik untuk video juga jadi bidikan sampulnya.
+Sumbernya dipilih sendiri: tiap aset punya tombol **Pilih untuk sampul**, dan
+yang terpilih cuma satu.
+
+- **Aset gambar** dipakai apa adanya.
+- **Klip video** diwakili frame di **titik mulai** potongannya - jadi menggeser
+  slider *Titik mulai* sekaligus memilih gambar sampulnya. Titik itu yang
+  dipakai karena itu juga yang pertama terlihat penonton, sehingga sampul dan
+  awal videonya menampilkan hal yang sama. Frame-nya diambil resolusi penuh,
+  bukan dari pratinjau 360px milik slider trim.
+
+Kalau tidak dipilih apa pun, gambar dipakai lebih dulu daripada klip - foto
+produk biasanya lebih rapi daripada frame acak dari rekaman. Pengaturan zoom dan
+geser dari aset itu ikut terpakai, jadi bagian yang kamu bidik untuk video juga
+jadi bidikan sampulnya.
 
 Teksnya tidak perlu diketik: judulnya memakai **hook yang sama** dengan kartu
 pembuka di videonya, dan harganya memakai penyebutan kabur yang sama

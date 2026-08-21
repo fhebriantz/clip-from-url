@@ -389,6 +389,23 @@ def _ukuran_judul(baris: list[str]) -> int:
     return max(THUMB_JUDUL_MIN, min(THUMB_JUDUL_MAKS, muat))
 
 
+def _gambar_sampul(aset, work: Path) -> Path:
+    """Gambar sumber untuk sampul; klip diwakili frame di titik mulai potongannya.
+
+    Frame diambil resolusi penuh, bukan lewat pratinjau 360px yang dipakai slider
+    trim - hasilnya diperbesar sampai 1080x1440, jadi versi kecil akan terlihat
+    pecah. Titik mulai dipakai karena itu yang pertama terlihat penonton, jadi
+    sampul dan awal videonya menampilkan hal yang sama.
+    """
+    if aset.kind != "video":
+        return aset.path
+    out = work / f"sampul-{aset.id}.png"
+    if not out.is_file():
+        run_ffmpeg(["-ss", f"{max(0.0, aset.trim_start):.3f}", "-i", str(aset.path),
+                    "-frames:v", "1", "-q:v", "2", str(out)])
+    return out
+
+
 def _render_thumbnail(image: Path, judul: str, harga: str, out: Path, work: Path,
                       potong: str = "") -> None:
     """Sampul 3:4 dari satu gambar aset, dengan template tetap dan teks.
@@ -731,16 +748,19 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     # sendiri kalau mau.
     baris_narasi = [hook_text] if hook_text else []
     baris_narasi += [sc["narration"] for sc in scenes]
-    # Sampul: dari aset yang ditandai, kalau tidak ada dari gambar pertama yang
-    # ada. Klip video dilewati - mengambil frame darinya butuh langkah tambahan
-    # dan hasilnya jarang sebagus foto produk yang dipilih sendiri.
-    sumber_thumb = next((m for m in media if m.thumb and m.kind == "image"), None)
+    # Sampul: dari aset yang ditandai. Kalau tidak ada yang ditandai, gambar
+    # dipilih lebih dulu daripada klip - foto produk biasanya lebih rapi
+    # daripada frame acak dari rekaman.
+    sumber_thumb = next((m for m in media if m.thumb), None)
     if sumber_thumb is None:
         sumber_thumb = next((m for m in media if m.kind == "image"), None)
+    if sumber_thumb is None:
+        sumber_thumb = next(iter(media), None)
     if sumber_thumb is not None:
         try:
             _render_thumbnail(
-                sumber_thumb.path, script["hook"], vague or product.price_text or "",
+                _gambar_sampul(sumber_thumb, work),
+                script["hook"], vague or product.price_text or "",
                 out_dir / f"{Path(filename).stem}.jpg", work,
                 potong=assets.crop_filter("3:4", sumber_thumb.zoom,
                                           sumber_thumb.cx, sumber_thumb.cy),
