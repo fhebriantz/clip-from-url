@@ -235,19 +235,18 @@ def asset_preview(asset_id: str) -> FileResponse:
 
 
 @app.get("/api/assets/{asset_id}/frame")
-def asset_frame(asset_id: str, t: float = 0.0, crop: str = "asli",
-                zoom: float = 1.0, cx: float = 0.5, cy: float = 0.5) -> FileResponse:
-    """Satu frame pada detik tertentu, untuk pratinjau trim dan crop."""
+def asset_frame(asset_id: str, t: float = 0.0) -> FileResponse:
+    """Satu frame pada detik tertentu, untuk memilih titik potong klip.
+
+    Frame ini sengaja tidak ikut dipotong: hasil crop sudah terlihat langsung di
+    panggung pada UI, sehingga cukup satu berkas per titik waktu.
+    """
     a = assets.load(asset_id)
     if not a:
         raise HTTPException(404, "Aset tidak ditemukan")
-    if crop not in assets.RASIO_CROP:
-        raise HTTPException(400, "Rasio crop tidak dikenal.")
-    potong = assets.crop_filter(crop, zoom, cx, cy)
-    if a.kind != "video" and not potong:
+    if a.kind != "video":
         return FileResponse(a.path)
-    return FileResponse(assets.frame_at(a, t, crop, zoom, cx, cy),
-                        media_type="image/jpeg")
+    return FileResponse(assets.frame_at(a, t), media_type="image/jpeg")
 
 
 @app.get("/api/assets/{asset_id}/file")

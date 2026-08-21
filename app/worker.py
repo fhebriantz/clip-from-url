@@ -30,12 +30,15 @@ def run_cleanup(force: bool = False) -> dict | None:
     try:
         hasil = assets.cleanup(db.asset_refs())
         hasil["simpanan_dibuang"] = cache.bersihkan()
+        hasil["work_dibuang"], hasil["work_bytes"] = assets.bersihkan_work()
     except Exception as exc:  # noqa: BLE001 - pembersihan gagal tidak boleh mematikan worker
         print(f"[bersih] gagal: {exc}", flush=True)
         return None
-    if hasil["dihapus"] or hasil["frame_dirapikan"]:
+    if hasil["dihapus"] or hasil["frame_dirapikan"] or hasil["work_dibuang"]:
         mb = hasil["bytes"] / 1024 / 1024
+        wmb = hasil["work_bytes"] / 1024 / 1024
         print(f"[bersih] {len(hasil['dihapus'])} aset dihapus ({mb:.1f} MB), "
+              f"{hasil['work_dibuang']} folder kerja dibuang ({wmb:.1f} MB), "
               f"{hasil.get('simpanan_dibuang', 0)} simpanan naskah/suara dibuang, "
               f"{hasil['frame_dirapikan']} frame cache dirapikan "
               f"(telantar >{ASSET_ORPHAN_HOURS} jam, terpakai >{ASSET_KEEP_DAYS} hari)",

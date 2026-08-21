@@ -461,12 +461,12 @@ const RASIO = [["asli", "Asli"], ["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"
 const RASIO_ANGKA = { "asli": 0, "1:1": 1, "3:4": 3 / 4, "9:16": 9 / 16 };
 const ZOOM_MAKS = 4;
 
+// Frame ini dipakai untuk memilih WAKTU, jadi tidak ikut dipotong. Potongannya
+// sudah terlihat langsung di panggung crop, dan menyertakan crop di sini berarti
+// satu panggilan FFmpeg plus satu berkas JPG baru tiap kali kotaknya digeser -
+// berkas yang nilainya kontinu dan praktis tidak akan pernah terpakai lagi.
 function frameUrl(a, t) {
-  // Cap waktu ikut disertakan supaya browser tidak menyajikan pratinjau lama
-  // dari cache saat potongannya diubah.
-  return `/api/assets/${a.id}/frame?t=${Number(t).toFixed(1)}`
-    + `&crop=${encodeURIComponent(a.crop ?? "asli")}&zoom=${(a.zoom ?? 1).toFixed(2)}`
-    + `&cx=${(a.cx ?? 0.5).toFixed(3)}&cy=${(a.cy ?? 0.5).toFixed(3)}&v=${a.rev ?? 0}`;
+  return `/api/assets/${a.id}/frame?t=${Number(t).toFixed(1)}`;
 }
 
 // Kotak potongan dihitung dalam piksel sumber. Pada zoom 1 kotaknya sebesar
@@ -503,7 +503,7 @@ function cropCtl(a) {
     class="chip${v === c ? " aktif" : ""}">${l}</button>`;
   // Gambar sumbernya utuh; yang menentukan bagian mana yang terlihat adalah
   // ukuran dan posisinya di dalam panggung, diatur lewat gaya inline.
-  const sumber = a.kind === "video" ? frameMentahUrl(a, a.start) : `/api/assets/${a.id}/file`;
+  const sumber = a.kind === "video" ? frameUrl(a, a.start) : `/api/assets/${a.id}/file`;
   return `<div class="crop">
     <div class="crop-baris"><span class="crop-lbl">Potong</span>
       ${RASIO.map(btn).join("")}</div>
@@ -519,12 +519,6 @@ function cropCtl(a) {
       <button type="button" class="link-btn" data-reset="${esc(a.id)}">Setel ulang</button>
     </div>
   </div>`;
-}
-
-// Panggung selalu menampilkan gambar sumber apa adanya; frame mentah dipakai
-// supaya yang diseret adalah gambar penuh, bukan hasil potongan.
-function frameMentahUrl(a, t) {
-  return `/api/assets/${a.id}/frame?t=${Number(t).toFixed(1)}&crop=asli`;
 }
 
 // Menempatkan gambar di dalam panggung sehingga yang terlihat persis kotak
@@ -620,9 +614,7 @@ $("assetList").addEventListener("input", (e) => {
     const a = ASSETS.find((x) => x.id === zoomId);
     if (a) {
       a.zoom = Number(e.target.value);
-      a.rev = (a.rev ?? 0) + 1;
       pasangPanggung(a);
-      if (a.kind === "video") { jadwalkanFrame(a, "start"); jadwalkanFrame(a, "end"); }
     }
     return;
   }
@@ -675,7 +667,7 @@ async function unggahAset(files) {
     if (!res.ok) throw new Error(body.detail || "Upload gagal");
     // Nilai trim awal: klip utuh.
     ASSETS = ASSETS.concat(body.map((a) => ({
-      ...a, start: 0, end: a.duration, crop: "asli", zoom: 1, cx: 0.5, cy: 0.5, rev: 0,
+      ...a, start: 0, end: a.duration, crop: "asli", zoom: 1, cx: 0.5, cy: 0.5,
     })));
     renderAssets();
     errEl.textContent = "";
@@ -735,9 +727,7 @@ $("assetList").addEventListener("click", (e) => {
     [...grup.querySelectorAll(".chip")].forEach((b) => b.classList.remove("aktif"));
     e.target.classList.add("aktif");
   }
-  a.rev = (a.rev ?? 0) + 1;
   pasangPanggung(a);
-  if (a.kind === "video") { jadwalkanFrame(a, "start"); jadwalkanFrame(a, "end"); }
 });
 
 // Menyeret panggung menggeser titik pusat potongan. Perpindahan dihitung dalam
@@ -773,8 +763,6 @@ function selesaiSeret() {
   SERET = null;
   document.querySelectorAll(".crop-panggung.menyeret")
     .forEach((el) => el.classList.remove("menyeret"));
-  a.rev = (a.rev ?? 0) + 1;
-  if (a.kind === "video") { jadwalkanFrame(a, "start"); jadwalkanFrame(a, "end"); }
 }
 
 $("assetList").addEventListener("pointerup", selesaiSeret);

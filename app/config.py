@@ -39,6 +39,9 @@ GEMINI_THINKING = os.getenv("GEMINI_THINKING", "low").strip().lower()
 # unggahan telantar dan dibuang lebih cepat daripada yang sudah terpakai.
 ASSET_ORPHAN_HOURS = int(os.getenv("ASSET_ORPHAN_HOURS", "24"))
 ASSET_KEEP_DAYS = int(os.getenv("ASSET_KEEP_DAYS", "7"))
+# Berkas antara per job (potongan scene, penggalan suara, berkas teks subtitle).
+# Disisakan sebentar supaya job yang gagal masih bisa diperiksa, lalu dibuang.
+WORK_KEEP_HOURS = int(os.getenv("WORK_KEEP_HOURS", "24"))
 
 # Berapa job diproses berbarengan. Sekitar 60-80% waktu job hanya menunggu API
 # Gemini, jadi menjalankan beberapa sekaligus menaikkan throughput tanpa menambah

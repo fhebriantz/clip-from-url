@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .config import ASSET_KEEP_DAYS, ASSET_ORPHAN_HOURS, DATA_DIR
+from .config import ASSET_KEEP_DAYS, ASSET_ORPHAN_HOURS, DATA_DIR, WORK_DIR, WORK_KEEP_HOURS
 from .tools import ensure_ffmpeg, ffprobe_path, run_ffmpeg
 
 UPLOAD_DIR = DATA_DIR / "uploads"
@@ -162,7 +162,7 @@ def make_preview(asset: Asset) -> None:
     ])
 
 
-def frame_at(asset: Asset, t: float, rasio: str = "asli", posisi: str = "tengah") -> Path:
+def frame_at(asset: Asset, t: float) -> Path:
     """Ambil satu frame pada detik `t`, dipakai untuk pratinjau slider trim.
 
     Lebih andal daripada mengandalkan pemutaran video di browser: rekaman HEVC
@@ -172,16 +172,13 @@ def frame_at(asset: Asset, t: float, rasio: str = "asli", posisi: str = "tengah"
     """
     t = max(0.0, min(t, max(0.0, asset.duration - 0.05)))
     key = int(round(t * 10)) * 100  # dibulatkan ke 0,1 detik
-    tanda = f"{rasio.replace(':', 'x')}-{zoom:.2f}-{cx:.3f}-{cy:.3f}"
-    out = asset.path.parent / f"frame-{key:07d}-{tanda}.jpg"
+    out = asset.path.parent / f"frame-{key:07d}.jpg"
     if out.is_file():
         return out
     src = preview_path(asset.id)
-    potong = crop_filter(rasio, zoom, cx, cy)
-    vf = f"{potong},scale=-2:360" if potong else "scale=-2:360"
     run_ffmpeg([
         "-ss", f"{t:.3f}", "-i", str(src if src.is_file() else asset.path),
-        "-frames:v", "1", "-q:v", "5", "-vf", vf, str(out),
+        "-frames:v", "1", "-q:v", "5", "-vf", "scale=-2:360", str(out),
     ])
     return out
 
@@ -343,3 +340,29 @@ def cleanup(refs: dict[str, str], now: datetime | None = None) -> dict:
             dirapikan += trim_frame_cache(asset_id)
 
     return {"dihapus": dihapus, "bytes": dibebaskan, "frame_dirapikan": dirapikan}
+
+
+def bersihkan_work() -> tuple[int, int]:
+    """Buang folder kerja per job yang sudah lewat WORK_KEEP_HOURS.
+
+    Isinya berkas antara - potongan scene, penggalan suara, berkas teks subtitle -
+    yang tidak dipakai lagi begitu videonya jadi. Job yang sedang berjalan aman:
+    folder yang baru disentuh tidak ikut terbuang. Patokannya berkas termuda di
+    dalam folder, bukan folder itu sendiri, karena mtime folder tidak berubah
+    saat isinya ditulis ulang.
+    """
+    if not WORK_DIR.is_dir():
+        return 0, 0
+    batas = datetime.now(timezone.utc) - timedelta(hours=WORK_KEEP_HOURS)
+    jumlah = ukuran = 0
+    for d in WORK_DIR.iterdir():
+        if not d.is_dir():
+            continue
+        berkas = [f for f in d.rglob("*") if f.is_file()]
+        sentuh = max((f.stat().st_mtime for f in berkas), default=d.stat().st_mtime)
+        if datetime.fromtimestamp(sentuh, timezone.utc) >= batas:
+            continue
+        ukuran += sum(f.stat().st_size for f in berkas)
+        shutil.rmtree(d, ignore_errors=True)
+        jumlah += 1
+    return jumlah, ukuran

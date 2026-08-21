@@ -519,6 +519,24 @@ atau sekitar **$1,80/bulan** untuk 10 video sehari.
 
 ---
 
+## Ruang penyimpanan
+
+Semua berkas kerja ada di `data/`, dan tiga di antaranya dibersihkan sendiri:
+
+| Folder | Isinya | Dibuang setelah |
+|---|---|---|
+| `data/uploads` | aset yang kamu unggah | `ASSET_ORPHAN_HOURS` (24 jam) kalau tidak jadi dipakai, atau `ASSET_KEEP_DAYS` (7 hari) setelah job terakhir yang memakainya |
+| `data/work` | berkas antara per job - potongan scene, penggalan suara, berkas teks subtitle | `WORK_KEEP_HOURS` (24 jam) |
+| `data/cache` | naskah dan narasi tersimpan | 14 hari sejak terakhir dipakai |
+
+Pembersihan berjalan sendiri tiap 6 jam dari worker, dan bisa dipicu manual
+lewat tombol **Bersihkan sekarang** di UI.
+
+Yang **tidak** dibersihkan otomatis adalah `OUTPUT_DIR` - video jadi dan berkas
+caption. Itu hasil kerjamu, jadi tidak pernah disentuh. Kalau `OUTPUT_DIR`
+diarahkan ke Google Drive, ruang Drive-mu akan terus terpakai sampai kamu sendiri
+yang merapikannya.
+
 # 4. Pemecahan masalah
 
 > Bagian ini memuat pesan error apa adanya supaya bisa didiagnosis tanpa menebak.
