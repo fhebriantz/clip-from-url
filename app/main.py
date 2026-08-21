@@ -286,7 +286,7 @@ async def ocr_deskripsi(file: UploadFile) -> dict[str, Any]:
         raise HTTPException(400, "Gambar lebih dari 12 MB.")
     kunci = "ocr:" + hashlib.sha256(blob).hexdigest()[:32]
     tersimpan = db.cache_ambil(kunci)
-    if tersimpan is not None:
+    if tersimpan:
         return {"teks": tersimpan, "dari_simpanan": True}
 
     mime = file.content_type or "image/png"
@@ -296,7 +296,10 @@ async def ocr_deskripsi(file: UploadFile) -> dict[str, Any]:
         teks = gemini_service.baca_tangkapan_layar(blob, mime)
     except Exception as exc:  # noqa: BLE001 - pesan mentah tidak ramah
         raise HTTPException(502, f"Gagal membaca tangkapan layar: {str(exc)[:150]}") from exc
-    db.cache_simpan(kunci, "ocr", teks)
+    # Hasil kosong tidak disimpan. Kalau disimpan, gambar itu akan selamanya
+    # balik kosong selama 14 hari ke depan dan tidak bisa dicoba ulang.
+    if teks.strip():
+        db.cache_simpan(kunci, "ocr", teks)
     return {"teks": teks, "dari_simpanan": False}
 
 

@@ -118,8 +118,10 @@ Tiga hal yang perlu diingat:
 - **Periksa hasilnya dulu.** Pembacaan bisa meleset, dan naskah akan memercayai
   apa pun yang ada di kolom deskripsi.
 - **Satu pembacaan = satu permintaan kuota**, berapa pun luas areanya.
-  Tangkapan layar yang sama persis dibaca dari simpanan dan tidak memakai kuota
-  lagi.
+  Potongan yang sama persis dibaca dari simpanan dan tidak memakai kuota lagi -
+  tapi kuncinya adalah isi potongannya, jadi menandai ulang area yang meleset
+  satu piksel pun sudah dihitung permintaan baru. Kalau mau memindai ulang
+  gambar yang sama tanpa memakai kuota, jangan sentuh kotaknya.
 - **Menyempitkan area tidak menghemat token.** Lihat catatan di bawah.
 
 Batasnya 12 MB per gambar, dan berkasnya harus benar-benar gambar.
