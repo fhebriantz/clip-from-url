@@ -93,13 +93,167 @@ $("jobs").addEventListener("click", async (e) => {
 
 /* ------------------------------------------- baca deskripsi dari tangkapan */
 
+/* Gambar tidak langsung dipindai: pengguna menandai dulu bagian mana yang mau
+   dibaca, lalu potongannya dibuat di browser sehingga yang sampai ke server
+   memang cuma bagian itu.
+
+   Ini bukan penghematan token - satu gambar berharga sekitar 1080 token rata,
+   berapa pun ukurannya (diukur lewat count_tokens). Yang dijaga adalah
+   ketepatannya: di halaman produk yang padat, ulasan dan promo gampang ikut
+   terbaca lalu dipercaya naskah. Satu pindaian yang salah berarti mengulang,
+   dan mengulang itulah yang benar-benar memakan kuota.
+
+   Kotaknya bebas, bukan rasio tetap - teks deskripsi biasanya berupa pita
+   lebar-pendek yang tidak pas di rasio mana pun. */
+
+let OCR = null;   // {img, url, w, h, sel:{x,y,w,h}, skala}
+let OCR_SERET = null;
+const OCR_MIN = 24;   // sisi terkecil kotak seleksi, dalam piksel sumber
+
+function bukaOcr(f) {
+  if (!f) return;
+  if (OCR) URL.revokeObjectURL(OCR.url);
+  const url = URL.createObjectURL(f);
+  const img = $("ocrGambar");
+  img.onload = () => {
+    OCR = { img, url, w: img.naturalWidth, h: img.naturalHeight, skala: 1,
+            sel: { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight } };
+    $("ocrTirai").hidden = false;
+    ukurOcr();
+    gambarOcr();
+  };
+  img.src = url;
+}
+
+function tutupOcr() {
+  if (OCR) URL.revokeObjectURL(OCR.url);
+  OCR = null;
+  OCR_SERET = null;
+  $("ocrTirai").hidden = true;
+}
+
+// Gambar ditampilkan sekecil apa pun layarnya; semua koordinat disimpan dalam
+// piksel sumber lalu dikalikan skala saat digambar, supaya hasil potongnya
+// tidak bergantung pada ukuran layar.
+function ukurOcr() {
+  if (!OCR) return;
+  OCR.skala = ($("ocrGambar").clientWidth || 1) / OCR.w;
+}
+
+function gambarOcr() {
+  if (!OCR) return;
+  const { sel, skala } = OCR;
+  const kotak = $("ocrPilih");
+  const L = sel.x * skala, T = sel.y * skala;
+  const W = sel.w * skala, H = sel.h * skala;
+  Object.assign(kotak.style, { left: `${L}px`, top: `${T}px`,
+                               width: `${W}px`, height: `${H}px` });
+  // Empat panel gelap di luar kotak, biar bagian terpilih yang menonjol.
+  const p = $("ocrPanggung");
+  const pw = p.clientWidth, ph = $("ocrGambar").clientHeight;
+  Object.assign($("ocrTutupAtas").style,
+    { left: 0, top: 0, width: `${pw}px`, height: `${T}px` });
+  Object.assign($("ocrTutupBawah").style,
+    { left: 0, top: `${T + H}px`, width: `${pw}px`, height: `${Math.max(0, ph - T - H)}px` });
+  Object.assign($("ocrTutupKiri").style,
+    { left: 0, top: `${T}px`, width: `${L}px`, height: `${H}px` });
+  Object.assign($("ocrTutupKanan").style,
+    { left: `${L + W}px`, top: `${T}px`, width: `${Math.max(0, pw - L - W)}px`, height: `${H}px` });
+
+  const bagian = (sel.w * sel.h) / (OCR.w * OCR.h);
+  $("ocrUkuran").textContent =
+    `${Math.round(sel.w)}x${Math.round(sel.h)} px - ${Math.round(bagian * 100)}% dari gambar`
+    + (bagian < 0.999 ? ", sisanya tidak ikut dibaca" : "");
+}
+
+function jepitOcr() {
+  const { sel, w, h } = OCR;
+  sel.w = Math.min(Math.max(sel.w, OCR_MIN), w);
+  sel.h = Math.min(Math.max(sel.h, OCR_MIN), h);
+  sel.x = Math.min(Math.max(sel.x, 0), w - sel.w);
+  sel.y = Math.min(Math.max(sel.y, 0), h - sel.h);
+}
+
+$("ocrPanggung").addEventListener("pointerdown", (e) => {
+  if (!OCR) return;
+  ukurOcr();
+  const r = $("ocrGambar").getBoundingClientRect();
+  const px = (e.clientX - r.left) / OCR.skala;
+  const py = (e.clientY - r.top) / OCR.skala;
+  const sudut = e.target.dataset?.sudut;
+
+  if (sudut) OCR_SERET = { mode: "ubah", sudut, sel: { ...OCR.sel } };
+  else if (e.target === $("ocrPilih"))
+    OCR_SERET = { mode: "geser", px, py, sel: { ...OCR.sel } };
+  else OCR_SERET = { mode: "baru", px, py };   // seret di area kosong = kotak baru
+
+  $("ocrPanggung").setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+
+$("ocrPanggung").addEventListener("pointermove", (e) => {
+  if (!OCR || !OCR_SERET) return;
+  const r = $("ocrGambar").getBoundingClientRect();
+  const px = Math.min(Math.max((e.clientX - r.left) / OCR.skala, 0), OCR.w);
+  const py = Math.min(Math.max((e.clientY - r.top) / OCR.skala, 0), OCR.h);
+  const d = OCR_SERET;
+
+  if (d.mode === "baru") {
+    OCR.sel = { x: Math.min(d.px, px), y: Math.min(d.py, py),
+                w: Math.abs(px - d.px), h: Math.abs(py - d.py) };
+  } else if (d.mode === "geser") {
+    OCR.sel = { ...d.sel, x: d.sel.x + (px - d.px), y: d.sel.y + (py - d.py) };
+  } else {
+    const s = d.sel;
+    const kiri = d.sudut.includes("w"), atas = d.sudut.includes("n");
+    const x1 = kiri ? px : s.x, x2 = kiri ? s.x + s.w : px;
+    const y1 = atas ? py : s.y, y2 = atas ? s.y + s.h : py;
+    OCR.sel = { x: Math.min(x1, x2), y: Math.min(y1, y2),
+                w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+  }
+  jepitOcr();
+  gambarOcr();
+});
+
+function selesaiOcrSeret() { OCR_SERET = null; }
+$("ocrPanggung").addEventListener("pointerup", selesaiOcrSeret);
+$("ocrPanggung").addEventListener("pointercancel", selesaiOcrSeret);
+
+$("ocrSemua").addEventListener("click", () => {
+  if (!OCR) return;
+  OCR.sel = { x: 0, y: 0, w: OCR.w, h: OCR.h };
+  gambarOcr();
+});
+
+$("ocrBatal").addEventListener("click", tutupOcr);
+$("ocrTirai").addEventListener("click", (e) => {
+  if (e.target === $("ocrTirai")) tutupOcr();
+});
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && OCR) tutupOcr();
+});
+addEventListener("resize", () => { if (OCR) { ukurOcr(); gambarOcr(); } });
+
+$("ocrPindai").addEventListener("click", async () => {
+  if (!OCR) return;
+  const { sel } = OCR;
+  const kanvas = document.createElement("canvas");
+  kanvas.width = Math.round(sel.w);
+  kanvas.height = Math.round(sel.h);
+  kanvas.getContext("2d").drawImage(OCR.img, Math.round(sel.x), Math.round(sel.y),
+    kanvas.width, kanvas.height, 0, 0, kanvas.width, kanvas.height);
+  const blob = await new Promise((r) => kanvas.toBlob(r, "image/png"));
+  tutupOcr();
+  await bacaTangkapan(blob);
+});
+
 async function bacaTangkapan(f) {
   if (!f) return;
   const el = $("ocrStatus");
   el.hidden = false;
   el.textContent = "Membaca tangkapan layar...";
   const fd = new FormData();
-  fd.append("file", f);
+  fd.append("file", f, "potongan.png");
   try {
     const res = await fetch("/api/ocr", { method: "POST", body: fd });
     const body = await res.json();
@@ -116,8 +270,8 @@ async function bacaTangkapan(f) {
   }
 }
 
-$("pOcr").addEventListener("change", async (e) => {
-  await bacaTangkapan(e.target.files[0]);
+$("pOcr").addEventListener("change", (e) => {
+  bukaOcr(e.target.files[0]);
   e.target.value = "";
 });
 
@@ -492,14 +646,15 @@ $("pDesc").addEventListener("paste", (e) => {
   if (!gambar.length) return;   // tempel teks biasa dibiarkan apa adanya
   e.preventDefault();
   e.stopPropagation();          // supaya tidak ikut terunggah jadi aset
-  bacaTangkapan(gambar[0]);
+  bukaOcr(gambar[0]);
 });
 
 document.addEventListener("paste", (e) => {
   const gambar = gambarDitempel(e);
   if (!gambar.length) return;
   e.preventDefault();
-  unggahAset(gambar);
+  if (OCR) bukaOcr(gambar[0]);   // penanda area sedang terbuka: ganti gambarnya
+  else unggahAset(gambar);
 });
 
 $("assetList").addEventListener("click", (e) => {

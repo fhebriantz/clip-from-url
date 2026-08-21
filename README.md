@@ -102,17 +102,48 @@ Menempel teks biasa di kolom deskripsi tetap berjalan normal.
 
 Deskripsi produk di aplikasi Shopee/Tokopedia sering tidak bisa disalin. Jalan
 pintasnya: screenshot bagian deskripsinya, lalu unggah atau tempel di kolom
-**Baca dari tangkapan layar**. Teksnya diketik ulang oleh AI dan **ditambahkan**
-ke kolom deskripsi, bukan menimpa isinya.
+**Baca dari tangkapan layar**.
 
-Dua hal yang perlu diingat:
+Gambarnya **tidak langsung dipindai**. Yang muncul dulu adalah penanda area:
+seret kotak di atas gambar untuk memilih bagian mana yang mau dibaca, lalu klik
+**Pindai bagian ini**. Kotaknya bebas - bisa dipindah, diubah ukurannya lewat
+keempat sudutnya, atau ditandai ulang dengan menyeret di area kosong. Tombol
+**Pilih seluruhnya** mengembalikannya ke gambar penuh.
+
+Potongannya dibuat di browser, jadi yang dikirim ke server memang cuma bagian
+terpilih. Hasilnya **ditambahkan** ke kolom deskripsi, bukan menimpa isinya.
+
+Tiga hal yang perlu diingat:
 
 - **Periksa hasilnya dulu.** Pembacaan bisa meleset, dan naskah akan memercayai
   apa pun yang ada di kolom deskripsi.
-- **Satu pembacaan = satu permintaan kuota.** Tangkapan layar yang sama persis
-  dibaca dari simpanan dan tidak memakai kuota lagi.
+- **Satu pembacaan = satu permintaan kuota**, berapa pun luas areanya.
+  Tangkapan layar yang sama persis dibaca dari simpanan dan tidak memakai kuota
+  lagi.
+- **Menyempitkan area tidak menghemat token.** Lihat catatan di bawah.
 
 Batasnya 12 MB per gambar, dan berkasnya harus benar-benar gambar.
+
+#### Kenapa menandai area tetap berguna
+
+Gambar ditagih rata, tidak menurut ukurannya. Diukur dengan `count_tokens` pada
+`gemini-3.6-flash`, dari tangkapan layar yang sama:
+
+| Ukuran dikirim | Piksel | Token |
+|---|---|---|
+| 1080x1920 | 2.073.600 | 1109 |
+| 1000x640 | 640.000 | 1075 |
+| 600x400 | 240.000 | 1089 |
+| 200x100 | 20.000 | 1090 |
+
+Prompt teksnya sendiri cuma 9 token, jadi satu gambar berharga sekitar **1081
+token rata** - gambar 200x100 sama mahalnya dengan 1080x1920.
+
+Yang dijaga penanda area bukan token, tapi **ketepatan**. Di halaman produk yang
+padat, ulasan pembeli, spanduk promo, dan produk terkait gampang ikut terbaca
+lalu dipercaya mentah-mentah oleh naskah. Satu pindaian yang salah berarti
+mengulang - dan mengulang itulah yang benar-benar memakan kuota, karena batas
+gratisnya dihitung per permintaan, bukan per token.
 
 ### Mengatur potongan aset
 

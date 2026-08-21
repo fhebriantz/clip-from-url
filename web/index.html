@@ -62,7 +62,8 @@
           <input id="pOcr" type="file" accept="image/*">
         </label>
         <div class="petunjuk">Atau klik dulu kolom deskripsi di atas, lalu
-          <b>Ctrl+V</b> - tangkapan layar di papan klip akan dibaca ke situ.</div>
+          <b>Ctrl+V</b>. Gambarnya tidak langsung dipindai - kamu menandai dulu
+          bagian mana yang mau dibaca.</div>
         <div id="ocrStatus" class="petunjuk" hidden></div>
 
         <div class="row">
@@ -125,6 +126,32 @@
   </section>
 </main>
 
+<div id="ocrTirai" class="tirai" hidden>
+  <div class="tirai-kotak" role="dialog" aria-modal="true" aria-labelledby="ocrJudul">
+    <h3 id="ocrJudul">Tandai bagian yang mau dibaca</h3>
+    <p class="petunjuk">Seret di atas gambar untuk menandai deskripsinya. Makin
+      sempit tandanya, makin sedikit kuota yang terpakai.</p>
+    <div id="ocrPanggung" class="ocr-panggung">
+      <img id="ocrGambar" alt="" draggable="false">
+      <div id="ocrTutupAtas" class="ocr-tutup"></div>
+      <div id="ocrTutupBawah" class="ocr-tutup"></div>
+      <div id="ocrTutupKiri" class="ocr-tutup"></div>
+      <div id="ocrTutupKanan" class="ocr-tutup"></div>
+      <div id="ocrPilih" class="ocr-pilih">
+        <span class="ocr-pegang" data-sudut="nw"></span>
+        <span class="ocr-pegang" data-sudut="ne"></span>
+        <span class="ocr-pegang" data-sudut="sw"></span>
+        <span class="ocr-pegang" data-sudut="se"></span>
+      </div>
+    </div>
+    <div id="ocrUkuran" class="ocr-ukuran"></div>
+    <div class="tirai-aksi">
+      <button type="button" class="link-btn" id="ocrBatal">Batal</button>
+      <button type="button" class="link-btn" id="ocrSemua">Pilih seluruhnya</button>
+      <button type="button" id="ocrPindai">Pindai bagian ini</button>
+    </div>
+  </div>
+</div>
 <script src="/app.js"></script>
 </body>
 </html>

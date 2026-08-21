@@ -434,3 +434,108 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
 }
 
 .asset-meta .lembut { color: var(--warn); }
+
+/* --------------------------------------------------- penanda area pindaian */
+.tirai {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 6, 10, .78);
+  backdrop-filter: blur(3px);
+}
+
+.tirai[hidden] { display: none; }
+
+.tirai-kotak {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(560px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+}
+
+.tirai-kotak h3 { margin: 0; font-size: 16px; }
+
+.tirai-aksi {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tirai-aksi button:not(.link-btn) {
+  padding: 9px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* touch-action: none supaya menyeret di HP menandai area, bukan menggulir. */
+.ocr-panggung {
+  position: relative;
+  align-self: center;
+  max-width: 100%;
+  line-height: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface-3);
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+}
+
+.ocr-panggung img {
+  display: block;
+  max-width: 100%;
+  max-height: 58vh;
+  width: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ocr-tutup {
+  position: absolute;
+  background: rgba(4, 6, 10, .62);
+  pointer-events: none;
+}
+
+.ocr-pilih {
+  position: absolute;
+  box-shadow: 0 0 0 2px var(--accent);
+  cursor: move;
+}
+
+.ocr-pegang {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.ocr-pegang[data-sudut="nw"] { left: -9px; top: -9px; cursor: nwse-resize; }
+.ocr-pegang[data-sudut="ne"] { right: -9px; top: -9px; cursor: nesw-resize; }
+.ocr-pegang[data-sudut="sw"] { left: -9px; bottom: -9px; cursor: nesw-resize; }
+.ocr-pegang[data-sudut="se"] { right: -9px; bottom: -9px; cursor: nwse-resize; }
+
+.ocr-ukuran {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  text-align: center;
+}
