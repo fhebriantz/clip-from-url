@@ -36,19 +36,42 @@ MIN_SISI_PENDEK = 120
 LEMBUT_DI_BAWAH = 900
 
 # Tangkapan layar biasanya memuat bilah status, tombol, dan bagian antarmuka lain
-# yang tidak perlu ikut masuk video. Rasio dan posisi crop diatur sendiri karena
-# bagian yang ingin dipakai tidak selalu di tengah.
+# yang tidak perlu ikut masuk video. Potongannya ditentukan tiga hal: rasio,
+# seberapa dekat (zoom), dan titik mana yang jadi pusatnya - bukan pilihan
+# atas/tengah/bawah, karena bagian yang ingin dipakai jarang pas di salah satu
+# dari tiga titik itu.
 RASIO_CROP = {"asli": None, "1:1": 1.0, "3:4": 3 / 4, "9:16": 9 / 16}
-POSISI_CROP = ("atas", "tengah", "bawah")
+ZOOM_MIN, ZOOM_MAX = 1.0, 4.0
 
 
-def crop_filter(rasio: str, posisi: str) -> str:
-    """Filter FFmpeg untuk memotong sumber ke rasio tertentu, atau string kosong."""
+def _jepit(v: float, bawah: float, atas: float) -> float:
+    return max(bawah, min(atas, v))
+
+
+def crop_filter(rasio: str, zoom: float = 1.0, cx: float = 0.5, cy: float = 0.5) -> str:
+    """Filter FFmpeg untuk memotong sumber, atau string kosong kalau tidak perlu.
+
+    `cx`/`cy` adalah titik pusat potongan dalam pecahan lebar/tinggi sumber, jadi
+    artinya tetap sama saat zoom-nya diubah. Titik pusat dijepit di sisi FFmpeg
+    supaya kotak potongnya tidak pernah keluar dari gambar.
+    """
     r = RASIO_CROP.get(rasio)
-    if not r:
-        return ""
-    y = {"atas": "0", "bawah": "ih-oh"}.get(posisi, "(ih-oh)/2")
-    return f"crop='min(iw,ih*{r})':'min(ih,iw/{r})':'(iw-ow)/2':'{y}'"
+    try:
+        z = _jepit(float(zoom), ZOOM_MIN, ZOOM_MAX)
+    except (TypeError, ValueError):
+        z = ZOOM_MIN
+    if r is None and z <= 1.001:
+        return ""   # rasio asli tanpa zoom berarti tidak ada yang dipotong
+    try:
+        x0, y0 = _jepit(float(cx), 0.0, 1.0), _jepit(float(cy), 0.0, 1.0)
+    except (TypeError, ValueError):
+        x0 = y0 = 0.5
+    w = "iw" if r is None else f"min(iw,ih*{r})"
+    h = "ih" if r is None else f"min(ih,iw/{r})"
+    if z > 1.001:
+        w, h = f"({w})/{z:g}", f"({h})/{z:g}"
+    return (f"crop='{w}':'{h}'"
+            f":'clip({x0:g}*iw-ow/2,0,iw-ow)':'clip({y0:g}*ih-oh/2,0,ih-oh)'")
 
 
 @dataclass
@@ -62,7 +85,9 @@ class Asset:
     trim_start: float = 0.0
     trim_end: float = 0.0   # 0 berarti sampai akhir klip
     crop: str = "asli"      # asli | 1:1 | 3:4 | 9:16
-    crop_pos: str = "tengah"  # atas | tengah | bawah
+    zoom: float = 1.0       # 1 = sejauh mungkin, 4 = paling dekat
+    cx: float = 0.5         # titik pusat potongan, pecahan dari lebar/tinggi
+    cy: float = 0.5
 
     @property
     def usable(self) -> float:
@@ -147,12 +172,12 @@ def frame_at(asset: Asset, t: float, rasio: str = "asli", posisi: str = "tengah"
     """
     t = max(0.0, min(t, max(0.0, asset.duration - 0.05)))
     key = int(round(t * 10)) * 100  # dibulatkan ke 0,1 detik
-    tanda = f"{rasio.replace(':', 'x')}-{posisi}"
+    tanda = f"{rasio.replace(':', 'x')}-{zoom:.2f}-{cx:.3f}-{cy:.3f}"
     out = asset.path.parent / f"frame-{key:07d}-{tanda}.jpg"
     if out.is_file():
         return out
     src = preview_path(asset.id)
-    potong = crop_filter(rasio, posisi)
+    potong = crop_filter(rasio, zoom, cx, cy)
     vf = f"{potong},scale=-2:360" if potong else "scale=-2:360"
     run_ffmpeg([
         "-ss", f"{t:.3f}", "-i", str(src if src.is_file() else asset.path),
@@ -205,8 +230,19 @@ def load(asset_id: str) -> Asset | None:
     return asset
 
 
+def _angka(v, bawaan: float, bawah: float, atas: float) -> float:
+    """Baca angka dari muatan permintaan; nilai aneh dikembalikan ke bawaannya."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return bawaan
+    if f != f:  # NaN
+        return bawaan
+    return _jepit(f, bawah, atas)
+
+
 def load_many(refs: list[dict]) -> list[Asset]:
-    """Muat aset beserta batas trim dan crop-nya. `refs` berisi {id, start, end, crop, crop_pos}."""
+    """Muat aset beserta batas trim dan crop-nya. `refs` berisi {id, start, end, crop, zoom, cx, cy}."""
     out: list[Asset] = []
     for ref in refs:
         asset_id = ref["id"] if isinstance(ref, dict) else str(ref)
@@ -216,8 +252,9 @@ def load_many(refs: list[dict]) -> list[Asset]:
         if isinstance(ref, dict):
             r = str(ref.get("crop") or "asli")
             asset.crop = r if r in RASIO_CROP else "asli"
-            pos = str(ref.get("crop_pos") or "tengah")
-            asset.crop_pos = pos if pos in POSISI_CROP else "tengah"
+            asset.zoom = _angka(ref.get("zoom"), 1.0, ZOOM_MIN, ZOOM_MAX)
+            asset.cx = _angka(ref.get("cx"), 0.5, 0.0, 1.0)
+            asset.cy = _angka(ref.get("cy"), 0.5, 0.0, 1.0)
         if isinstance(ref, dict) and asset.kind == "video":
             asset.trim_start = max(0.0, min(float(ref.get("start") or 0), asset.duration))
             end = float(ref.get("end") or 0)

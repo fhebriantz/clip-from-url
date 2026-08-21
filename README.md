@@ -77,7 +77,7 @@ supaya nyaman dipakai dari layar HP.
 | **URL produk** | tidak, kalau Nama produk dan aset diisi | Shopee, Tokopedia, atau tautan share TikTok Shop |
 | **Nama produk** | tidak | Biasanya terbaca sendiri dari alamatnya |
 | **Harga** | tidak | Isi `59000` atau `Rp59.000`. Wajib untuk TikTok Shop |
-| **Aset sendiri** | tidak | Gambar atau klip video. Klip punya slider trim, semuanya punya pengaturan potong |
+| **Aset sendiri** | tidak | Gambar atau klip video. Klip punya slider trim; semuanya bisa dipotong dengan geser dan zoom |
 | **Deskripsi sendiri** | tidak | Kalau diisi, menggantikan deskripsi dari halaman |
 | **Baca dari tangkapan layar** | tidak | Screenshot deskripsi produk, teksnya diketik ulang oleh AI |
 | **Target durasi** | ya | 15-60 detik |
@@ -126,14 +126,22 @@ lain yang tidak perlu masuk video. Tiap aset punya baris **Potong**:
 | **3:4** | Potret, cocok untuk foto produk |
 | **9:16** | Potret penuh, sama seperti rasio videonya |
 
-Baris **Bagian** menentukan sisi mana yang diambil - **Atas**, **Tengah**, atau
-**Bawah** - karena bagian yang ingin dipakai tidak selalu ada di tengah.
-Pilihan ini mati saat rasionya masih *Asli*.
+Bagian mana yang diambil **tidak ditebak lewat pilihan atas/tengah/bawah**,
+tapi diatur langsung:
 
-Pratinjaunya ikut berubah begitu diklik, jadi hasil potongnya bisa dilihat
-sebelum videonya dibuat. Potongan ini diterapkan lebih dulu, baru gambarnya
-dipasang ke tata letak - jadi latar buramnya juga memakai bagian yang sudah
-dipotong.
+- **Seret gambarnya** di kotak pratinjau untuk menggeser bagian yang terlihat.
+- **Slider Zoom** (1x sampai 4x) untuk mendekat atau menjauh. Pada 1x kotak
+  potongnya sebesar mungkin selama masih muat di gambar.
+- **Setel ulang** mengembalikan ke tengah dan zoom 1x.
+
+Zoom juga bekerja pada rasio *Asli*, jadi gambar bisa didekati tanpa mengubah
+bentuknya. Kotak pratinjau itu **bukan perkiraan** - isinya persis sama dengan
+hasil render (sudah dicocokkan piksel-per-piksel).
+
+Yang disimpan adalah **titik pusat** potongannya, bukan sudut kiri atas, jadi
+mengubah zoom tidak menggeser bagian yang sudah kamu pilih. Potongan diterapkan
+lebih dulu, baru gambarnya dipasang ke tata letak - jadi latar buramnya juga
+memakai bagian yang sudah dipotong.
 
 **Memotong tidak menambah ketajaman, justru menguranginya.** Produk dipasang
 selebar sekitar 982px di video 1080x1920, jadi apa pun yang lebih kecil harus
@@ -147,9 +155,12 @@ dari tangkapan layar 606x272:
 | 3:4 | 204px | 4,8x |
 | 9:16 | 153px | 6,4x |
 
-Angka perbesarannya ditampilkan di kartu aset dan ikut berubah tiap kali
-rasionya diganti. Di atas 3,5x tulisannya berubah kuning - masih bisa dipakai,
-tapi hasilnya akan kelihatan lembut.
+Zoom menambah efek yang sama: zoom 2x memotong lebarnya jadi separuh, jadi
+perbesarannya ikut dua kali lipat.
+
+Angka perbesarannya ditampilkan di kartu aset dan ikut berubah tiap kali rasio
+atau zoom-nya diganti. Di atas 3,5x tulisannya berubah kuning - masih bisa
+dipakai, tapi hasilnya akan kelihatan lembut.
 
 ## Kapan tautan produk dibuka
 

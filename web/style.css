@@ -359,7 +359,7 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
 .crop {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 10px 12px 12px;
   border-top: 1px solid var(--border);
 }
@@ -369,10 +369,7 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  transition: opacity .15s ease;
 }
-
-.crop-baris.redup { opacity: .38; pointer-events: none; }
 
 .crop-lbl {
   min-width: 58px;
@@ -399,6 +396,41 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
   background: var(--accent);
   border-color: var(--accent);
   font-weight: 600;
+}
+
+/* Panggung menampilkan gambar sumber di balik jendela serasio potongannya.
+   touch-action: none supaya menyeret di HP menggeser gambar, bukan menggulir
+   halaman. */
+.crop-panggung {
+  position: relative;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface-3);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.crop-panggung.menyeret { cursor: grabbing; }
+
+.crop-panggung img {
+  position: absolute;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.crop-zoom { flex: 1; min-width: 120px; }
+
+.crop-zoomnilai {
+  min-width: 44px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 
 .asset-meta .lembut { color: var(--warn); }

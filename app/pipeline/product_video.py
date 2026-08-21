@@ -608,7 +608,7 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
             return i
         j = i - offset
         asset = media[j % len(media)]
-        potong = assets.crop_filter(asset.crop, asset.crop_pos)
+        potong = assets.crop_filter(asset.crop, asset.zoom, asset.cx, asset.cy)
         if asset.kind == "video":
             _render_clip(asset, durations[i] + pads[i], scenes[j]["caption"],
                          clips[i], work, j, layout=layout, potong=potong)

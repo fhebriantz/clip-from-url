@@ -85,7 +85,9 @@ class AssetRef(BaseModel):
     start: float = Field(default=0.0, ge=0, le=3600)
     end: float = Field(default=0.0, ge=0, le=3600)
     crop: Literal["asli", "1:1", "3:4", "9:16"] = "asli"
-    crop_pos: Literal["atas", "tengah", "bawah"] = "tengah"
+    zoom: float = Field(default=1.0, ge=1.0, le=4.0)
+    cx: float = Field(default=0.5, ge=0.0, le=1.0)
+    cy: float = Field(default=0.5, ge=0.0, le=1.0)
 
     @field_validator("id")
     @classmethod
@@ -234,16 +236,18 @@ def asset_preview(asset_id: str) -> FileResponse:
 
 @app.get("/api/assets/{asset_id}/frame")
 def asset_frame(asset_id: str, t: float = 0.0, crop: str = "asli",
-                pos: str = "tengah") -> FileResponse:
+                zoom: float = 1.0, cx: float = 0.5, cy: float = 0.5) -> FileResponse:
     """Satu frame pada detik tertentu, untuk pratinjau trim dan crop."""
     a = assets.load(asset_id)
     if not a:
         raise HTTPException(404, "Aset tidak ditemukan")
-    if crop not in assets.RASIO_CROP or pos not in assets.POSISI_CROP:
-        raise HTTPException(400, "Rasio atau posisi crop tidak dikenal.")
-    if a.kind != "video" and crop == "asli":
+    if crop not in assets.RASIO_CROP:
+        raise HTTPException(400, "Rasio crop tidak dikenal.")
+    potong = assets.crop_filter(crop, zoom, cx, cy)
+    if a.kind != "video" and not potong:
         return FileResponse(a.path)
-    return FileResponse(assets.frame_at(a, t, crop, pos), media_type="image/jpeg")
+    return FileResponse(assets.frame_at(a, t, crop, zoom, cx, cy),
+                        media_type="image/jpeg")
 
 
 @app.get("/api/assets/{asset_id}/file")

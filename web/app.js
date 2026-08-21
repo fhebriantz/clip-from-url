@@ -243,28 +243,39 @@ function fmtDetik(v) {
 }
 
 const RASIO = [["asli", "Asli"], ["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"]];
-const POSISI = [["atas", "Atas"], ["tengah", "Tengah"], ["bawah", "Bawah"]];
+const RASIO_ANGKA = { "asli": 0, "1:1": 1, "3:4": 3 / 4, "9:16": 9 / 16 };
+const ZOOM_MAKS = 4;
 
 function frameUrl(a, t) {
-  const c = a.crop ?? "asli";
-  const p = a.crop_pos ?? "tengah";
   // Cap waktu ikut disertakan supaya browser tidak menyajikan pratinjau lama
-  // dari cache saat rasio crop diganti.
+  // dari cache saat potongannya diubah.
   return `/api/assets/${a.id}/frame?t=${Number(t).toFixed(1)}`
-    + `&crop=${encodeURIComponent(c)}&pos=${p}&v=${a.rev ?? 0}`;
+    + `&crop=${encodeURIComponent(a.crop ?? "asli")}&zoom=${(a.zoom ?? 1).toFixed(2)}`
+    + `&cx=${(a.cx ?? 0.5).toFixed(3)}&cy=${(a.cy ?? 0.5).toFixed(3)}&v=${a.rev ?? 0}`;
 }
 
-// Produk dipasang selebar ~982px di video 1080x1920. Memotong gambar membuang
-// piksel, jadi makin ketat crop-nya makin jauh sisanya harus diperbesar - itu
-// yang bikin hasilnya lembut, bukan sebaliknya.
+// Kotak potongan dihitung dalam piksel sumber. Pada zoom 1 kotaknya sebesar
+// mungkin selama masih muat di gambar; zoom mengecilkan kotaknya, dan titik
+// pusat (cx, cy) menggeser letaknya. Menyimpan titik pusat - bukan sudut kiri
+// atas - membuat artinya tetap sama saat zoom-nya diubah.
+function kotakPotong(a) {
+  const r = RASIO_ANGKA[a.crop ?? "asli"];
+  const z = a.zoom ?? 1;
+  const w = (r ? Math.min(a.width, a.height * r) : a.width) / z;
+  const h = (r ? Math.min(a.height, a.width / r) : a.height) / z;
+  const x = Math.min(Math.max((a.cx ?? 0.5) * a.width - w / 2, 0), a.width - w);
+  const y = Math.min(Math.max((a.cy ?? 0.5) * a.height - h / 2, 0), a.height - h);
+  return { x, y, w, h };
+}
+
+// Produk dipasang selebar ~982px di video 1080x1920. Memotong dan memperbesar
+// membuang piksel, jadi makin ketat potongannya makin jauh sisanya diperbesar -
+// itu yang bikin hasilnya lembut.
 const LEBAR_TAMPIL = 982;
-const RASIO_ANGKA = { "asli": 0, "1:1": 1, "3:4": 3 / 4, "9:16": 9 / 16 };
 
 function ketajaman(a) {
-  const r = RASIO_ANGKA[a.crop ?? "asli"];
-  const w = r ? Math.min(a.width, a.height * r) : a.width;
-  const kali = LEBAR_TAMPIL / w;
-  if (kali <= 1) return { teks: `tajam (${Math.round(w)}px)`, kelas: "" };
+  const kali = LEBAR_TAMPIL / kotakPotong(a).w;
+  if (kali <= 1) return { teks: `tajam (${Math.round(kotakPotong(a).w)}px)`, kelas: "" };
   const label = `${kali.toFixed(1)}x diperbesar`;
   if (kali <= 2) return { teks: label, kelas: "" };
   if (kali <= 3.5) return { teks: `${label}, agak lembut`, kelas: "lembut" };
@@ -273,17 +284,56 @@ function ketajaman(a) {
 
 function cropCtl(a) {
   const c = a.crop ?? "asli";
-  const p = a.crop_pos ?? "tengah";
   const btn = ([v, l]) => `<button type="button" data-crop="${v}" data-id="${esc(a.id)}"
     class="chip${v === c ? " aktif" : ""}">${l}</button>`;
-  const pos = ([v, l]) => `<button type="button" data-croppos="${v}" data-id="${esc(a.id)}"
-    class="chip${v === p ? " aktif" : ""}">${l}</button>`;
+  // Gambar sumbernya utuh; yang menentukan bagian mana yang terlihat adalah
+  // ukuran dan posisinya di dalam panggung, diatur lewat gaya inline.
+  const sumber = a.kind === "video" ? frameMentahUrl(a, a.start) : `/api/assets/${a.id}/file`;
   return `<div class="crop">
     <div class="crop-baris"><span class="crop-lbl">Potong</span>
       ${RASIO.map(btn).join("")}</div>
-    <div class="crop-baris${c === "asli" ? " redup" : ""}" id="croppos-${esc(a.id)}">
-      <span class="crop-lbl">Bagian</span>${POSISI.map(pos).join("")}</div>
+    <div class="crop-panggung" id="panggung-${esc(a.id)}" data-geser="${esc(a.id)}"
+         title="Seret untuk menggeser">
+      <img id="cropimg-${esc(a.id)}" src="${sumber}" alt="" draggable="false">
+    </div>
+    <div class="crop-baris">
+      <span class="crop-lbl">Zoom</span>
+      <input type="range" class="crop-zoom" data-zoom="${esc(a.id)}"
+             min="1" max="${ZOOM_MAKS}" step="0.05" value="${a.zoom ?? 1}">
+      <span class="crop-zoomnilai" id="zoomlbl-${esc(a.id)}">${(a.zoom ?? 1).toFixed(2)}x</span>
+      <button type="button" class="link-btn" data-reset="${esc(a.id)}">Setel ulang</button>
+    </div>
   </div>`;
+}
+
+// Panggung selalu menampilkan gambar sumber apa adanya; frame mentah dipakai
+// supaya yang diseret adalah gambar penuh, bukan hasil potongan.
+function frameMentahUrl(a, t) {
+  return `/api/assets/${a.id}/frame?t=${Number(t).toFixed(1)}&crop=asli`;
+}
+
+// Menempatkan gambar di dalam panggung sehingga yang terlihat persis kotak
+// potongannya. Panggung dibuat serasio potongan lewat aspect-ratio.
+function pasangPanggung(a) {
+  const panggung = $(`panggung-${a.id}`);
+  const img = $(`cropimg-${a.id}`);
+  if (!panggung || !img) return;
+  const k = kotakPotong(a);
+  panggung.style.aspectRatio = `${k.w} / ${k.h}`;
+  const skala = (panggung.clientWidth || 1) / k.w;
+  img.style.width = `${a.width * skala}px`;
+  img.style.left = `${-k.x * skala}px`;
+  img.style.top = `${-k.y * skala}px`;
+
+  const t = ketajaman(a);
+  const tEl = $(`tajam-${a.id}`);
+  if (tEl) { tEl.textContent = t.teks; tEl.className = t.kelas; }
+  const zEl = $(`zoomlbl-${a.id}`);
+  if (zEl) zEl.textContent = `${(a.zoom ?? 1).toFixed(2)}x`;
+}
+
+function pasangSemuaPanggung() {
+  ASSETS.forEach(pasangPanggung);
 }
 
 function assetCard(a) {
@@ -337,9 +387,30 @@ function assetCard(a) {
 function renderAssets() {
   const el = $("assetList");
   el.innerHTML = ASSETS.length ? ASSETS.map(assetCard).join("") : "";
+  // Panggung baru bisa diukur setelah masuk DOM, dan gambarnya perlu dipasang
+  // ulang begitu ukurannya diketahui browser.
+  pasangSemuaPanggung();
+  el.querySelectorAll(".crop-panggung img").forEach((img) => {
+    img.addEventListener("load", pasangSemuaPanggung, { once: true });
+  });
 }
 
+// Memutar HP atau mengubah lebar jendela mengubah lebar panggung, jadi letak
+// gambarnya harus dihitung ulang.
+addEventListener("resize", pasangSemuaPanggung);
+
 $("assetList").addEventListener("input", (e) => {
+  const zoomId = e.target.dataset?.zoom;
+  if (zoomId) {
+    const a = ASSETS.find((x) => x.id === zoomId);
+    if (a) {
+      a.zoom = Number(e.target.value);
+      a.rev = (a.rev ?? 0) + 1;
+      pasangPanggung(a);
+      if (a.kind === "video") { jadwalkanFrame(a, "start"); jadwalkanFrame(a, "end"); }
+    }
+    return;
+  }
   const id = e.target.dataset?.id;
   const which = e.target.dataset?.trim;
   if (!id || !which) return;
@@ -389,7 +460,7 @@ async function unggahAset(files) {
     if (!res.ok) throw new Error(body.detail || "Upload gagal");
     // Nilai trim awal: klip utuh.
     ASSETS = ASSETS.concat(body.map((a) => ({
-      ...a, start: 0, end: a.duration, crop: "asli", crop_pos: "tengah", rev: 0,
+      ...a, start: 0, end: a.duration, crop: "asli", zoom: 1, cx: 0.5, cy: 0.5, rev: 0,
     })));
     renderAssets();
     errEl.textContent = "";
@@ -433,31 +504,65 @@ document.addEventListener("paste", (e) => {
 
 $("assetList").addEventListener("click", (e) => {
   const d = e.target.dataset || {};
-  const id = d.id;
-  if (!id || (d.crop === undefined && d.croppos === undefined)) return;
+  const id = d.id || d.reset;
+  if (!id || (d.crop === undefined && d.reset === undefined)) return;
   const a = ASSETS.find((x) => x.id === id);
   if (!a) return;
-  if (d.crop !== undefined) a.crop = d.crop;
-  else a.crop_pos = d.croppos;
-  a.rev = (a.rev ?? 0) + 1;
 
-  const grup = e.target.parentElement;
-  [...grup.querySelectorAll(".chip")].forEach((b) => b.classList.remove("aktif"));
-  e.target.classList.add("aktif");
-  $(`croppos-${id}`).classList.toggle("redup", (a.crop ?? "asli") === "asli");
-
-  const t = ketajaman(a);
-  const tEl = $(`tajam-${id}`);
-  tEl.textContent = t.teks;
-  tEl.className = t.kelas;
-
-  if (a.kind === "video") {
-    jadwalkanFrame(a, "start");
-    jadwalkanFrame(a, "end");
+  if (d.reset !== undefined) {
+    a.zoom = 1; a.cx = 0.5; a.cy = 0.5;
+    const sl = document.querySelector(`[data-zoom="${id}"]`);
+    if (sl) sl.value = 1;
   } else {
-    $(`thumb-${id}`).src = frameUrl(a, 0);
+    a.crop = d.crop;
+    const grup = e.target.parentElement;
+    [...grup.querySelectorAll(".chip")].forEach((b) => b.classList.remove("aktif"));
+    e.target.classList.add("aktif");
   }
+  a.rev = (a.rev ?? 0) + 1;
+  pasangPanggung(a);
+  if (a.kind === "video") { jadwalkanFrame(a, "start"); jadwalkanFrame(a, "end"); }
 });
+
+// Menyeret panggung menggeser titik pusat potongan. Perpindahan dihitung dalam
+// piksel sumber, bukan piksel layar, supaya rasanya sama di HP dan di PC.
+let SERET = null;
+
+$("assetList").addEventListener("pointerdown", (e) => {
+  const id = e.target.closest("[data-geser]")?.dataset.geser;
+  if (!id) return;
+  const a = ASSETS.find((x) => x.id === id);
+  if (!a) return;
+  const panggung = $(`panggung-${id}`);
+  const skala = (panggung.clientWidth || 1) / kotakPotong(a).w;
+  SERET = { a, skala, x: e.clientX, y: e.clientY };
+  panggung.setPointerCapture(e.pointerId);
+  panggung.classList.add("menyeret");
+  e.preventDefault();
+});
+
+$("assetList").addEventListener("pointermove", (e) => {
+  if (!SERET) return;
+  const { a, skala } = SERET;
+  // Menyeret ke kanan berarti melihat bagian yang lebih kiri, jadi tandanya dibalik.
+  a.cx = Math.min(Math.max((a.cx ?? 0.5) - (e.clientX - SERET.x) / skala / a.width, 0), 1);
+  a.cy = Math.min(Math.max((a.cy ?? 0.5) - (e.clientY - SERET.y) / skala / a.height, 0), 1);
+  SERET.x = e.clientX; SERET.y = e.clientY;
+  pasangPanggung(a);
+});
+
+function selesaiSeret() {
+  if (!SERET) return;
+  const a = SERET.a;
+  SERET = null;
+  document.querySelectorAll(".crop-panggung.menyeret")
+    .forEach((el) => el.classList.remove("menyeret"));
+  a.rev = (a.rev ?? 0) + 1;
+  if (a.kind === "video") { jadwalkanFrame(a, "start"); jadwalkanFrame(a, "end"); }
+}
+
+$("assetList").addEventListener("pointerup", selesaiSeret);
+$("assetList").addEventListener("pointercancel", selesaiSeret);
 
 $("assetList").addEventListener("click", async (e) => {
   const id = e.target.dataset?.asset;
@@ -562,7 +667,7 @@ $("formProduct").addEventListener("submit", (e) => {
     tts_model: $("pTtsModel").value,
     assets: ASSETS.map((a) => ({
       id: a.id, start: a.start ?? 0, end: a.end ?? 0,
-      crop: a.crop ?? "asli", crop_pos: a.crop_pos ?? "tengah",
+      crop: a.crop ?? "asli", zoom: a.zoom ?? 1, cx: a.cx ?? 0.5, cy: a.cy ?? 0.5,
     })),
     description: $("pDesc").value.trim(),
   }, "product");
