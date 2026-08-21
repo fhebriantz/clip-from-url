@@ -119,9 +119,15 @@ Tiga hal yang perlu diingat:
   apa pun yang ada di kolom deskripsi.
 - **Satu pembacaan = satu permintaan kuota**, berapa pun luas areanya.
   Potongan yang sama persis dibaca dari simpanan dan tidak memakai kuota lagi -
-  tapi kuncinya adalah isi potongannya, jadi menandai ulang area yang meleset
-  satu piksel pun sudah dihitung permintaan baru. Kalau mau memindai ulang
-  gambar yang sama tanpa memakai kuota, jangan sentuh kotaknya.
+  tapi kuncinya adalah isi potongannya, jadi area yang meleset satu piksel pun
+  sudah dihitung permintaan baru. Karena itu **kotaknya diingat per gambar**:
+  menempel tangkapan layar yang sama akan memulihkan kotak terakhir yang kamu
+  pakai, jadi selama tidak disentuh hasilnya diambil dari simpanan. Begitu
+  kotaknya digeser atau diubah ukurannya, itu jadi permintaan baru.
+
+  Ingatannya disimpan di browser (50 gambar terakhir), jadi terpisah antara HP
+  dan PC. Kalau penyimpanan situs dimatikan, fiturnya cuma tidak mengingat -
+  pemindaiannya tetap jalan.
 - **Menyempitkan area tidak menghemat token.** Lihat catatan di bawah.
 
 Batasnya 12 MB per gambar, dan berkasnya harus benar-benar gambar.

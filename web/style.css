@@ -539,3 +539,15 @@ button:disabled { opacity: .45; cursor: not-allowed; filter: none; transform: no
   color: var(--muted);
   text-align: center;
 }
+
+.ocr-diingat {
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+}
+
+.ocr-diingat[hidden] { display: none; }

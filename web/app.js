@@ -106,18 +106,74 @@ $("jobs").addEventListener("click", async (e) => {
    Kotaknya bebas, bukan rasio tetap - teks deskripsi biasanya berupa pita
    lebar-pendek yang tidak pas di rasio mana pun. */
 
-let OCR = null;   // {img, url, w, h, sel:{x,y,w,h}, skala}
+let OCR = null;   // {img, url, w, h, sel:{x,y,w,h}, skala, sidik}
 let OCR_SERET = null;
 const OCR_MIN = 24;   // sisi terkecil kotak seleksi, dalam piksel sumber
 
-function bukaOcr(f) {
+/* Kotak yang sudah dipakai diingat per gambar, supaya menempel tangkapan layar
+   yang sama lagi menghasilkan potongan yang byte-nya identik - itu syarat agar
+   pembacaannya diambil dari simpanan dan tidak memakai kuota.
+
+   Sidik gambarnya dihitung dengan FNV-1a, bukan crypto.subtle: SubtleCrypto
+   hanya tersedia di HTTPS atau localhost, sedangkan UI ini sering dibuka dari
+   HP lewat http://192.168.x.x. Ini bukan hash kriptografis, dan memang tidak
+   perlu - tabrakan paling banter membuat kotaknya muncul di posisi yang salah,
+   dan itu langsung kelihatan. */
+const OCR_KOTAK_KUNCI = "ocrKotak";
+const OCR_KOTAK_MAKS = 50;
+
+function sidikGambar(buf) {
+  const b = new Uint8Array(buf);
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < b.length; i++) {
+    h1 = Math.imul(h1 ^ b[i], 0x01000193);
+    h2 = Math.imul(h2 + b[i], 0x85ebca6b) ^ (h2 >>> 13);
+  }
+  const sisip = (n) => (n >>> 0).toString(16).padStart(8, "0");
+  return sisip(h1) + sisip(h2) + "-" + b.length.toString(16);
+}
+
+// localStorage bisa melempar di mode penyamaran atau saat penyimpanan situs
+// dimatikan, jadi baca-tulisnya selalu dijaga.
+function kotakTersimpan() {
+  try {
+    return JSON.parse(localStorage.getItem(OCR_KOTAK_KUNCI) || "{}");
+  } catch { return {}; }
+}
+
+function simpanKotak(sidik, sel) {
+  try {
+    const semua = kotakTersimpan();
+    semua[sidik] = { x: sel.x, y: sel.y, w: sel.w, h: sel.h, t: Date.now() };
+    // Buang yang paling lama supaya penyimpanannya tidak tumbuh terus.
+    const kunci = Object.keys(semua).sort((a, b) => semua[b].t - semua[a].t);
+    const rapi = {};
+    kunci.slice(0, OCR_KOTAK_MAKS).forEach((k) => { rapi[k] = semua[k]; });
+    localStorage.setItem(OCR_KOTAK_KUNCI, JSON.stringify(rapi));
+  } catch { /* penyimpanan tidak tersedia - fiturnya cuma tidak mengingat */ }
+}
+
+async function bukaOcr(f) {
   if (!f) return;
   if (OCR) URL.revokeObjectURL(OCR.url);
+  let sidik = null;
+  try {
+    sidik = sidikGambar(await f.arrayBuffer());
+  } catch { /* tanpa sidik, kotaknya cuma tidak diingat */ }
+
   const url = URL.createObjectURL(f);
   const img = $("ocrGambar");
   img.onload = () => {
-    OCR = { img, url, w: img.naturalWidth, h: img.naturalHeight, skala: 1,
-            sel: { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight } };
+    const w = img.naturalWidth, h = img.naturalHeight;
+    OCR = { img, url, w, h, skala: 1, sidik, sel: { x: 0, y: 0, w, h } };
+    const dulu = sidik ? kotakTersimpan()[sidik] : null;
+    // Kotak lama hanya dipakai kalau memang muat di gambar ini.
+    if (dulu && dulu.w >= OCR_MIN && dulu.h >= OCR_MIN
+        && dulu.x + dulu.w <= w + 1 && dulu.y + dulu.h <= h + 1) {
+      OCR.sel = { x: dulu.x, y: dulu.y, w: dulu.w, h: dulu.h };
+      jepitOcr();
+      OCR.diingat = true;
+    }
     $("ocrTirai").hidden = false;
     ukurOcr();
     gambarOcr();
@@ -164,6 +220,8 @@ function gambarOcr() {
   $("ocrUkuran").textContent =
     `${Math.round(sel.w)}x${Math.round(sel.h)} px - ${Math.round(bagian * 100)}% dari gambar`
     + (bagian < 0.999 ? ", sisanya tidak ikut dibaca" : "");
+  const nota = $("ocrDiingat");
+  nota.hidden = !OCR.diingat;
 }
 
 function jepitOcr() {
@@ -211,6 +269,7 @@ $("ocrPanggung").addEventListener("pointermove", (e) => {
     OCR.sel = { x: Math.min(x1, x2), y: Math.min(y1, y2),
                 w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
   }
+  OCR.diingat = false;
   jepitOcr();
   gambarOcr();
 });
@@ -222,6 +281,7 @@ $("ocrPanggung").addEventListener("pointercancel", selesaiOcrSeret);
 $("ocrSemua").addEventListener("click", () => {
   if (!OCR) return;
   OCR.sel = { x: 0, y: 0, w: OCR.w, h: OCR.h };
+  OCR.diingat = false;
   gambarOcr();
 });
 
@@ -237,6 +297,7 @@ addEventListener("resize", () => { if (OCR) { ukurOcr(); gambarOcr(); } });
 $("ocrPindai").addEventListener("click", async () => {
   if (!OCR) return;
   const { sel } = OCR;
+  if (OCR.sidik) simpanKotak(OCR.sidik, sel);
   const kanvas = document.createElement("canvas");
   kanvas.width = Math.round(sel.w);
   kanvas.height = Math.round(sel.h);
