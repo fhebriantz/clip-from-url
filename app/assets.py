@@ -88,6 +88,7 @@ class Asset:
     zoom: float = 1.0       # 1 = sejauh mungkin, 4 = paling dekat
     cx: float = 0.5         # titik pusat potongan, pecahan dari lebar/tinggi
     cy: float = 0.5
+    thumb: bool = False     # dipilih jadi sampul
 
     @property
     def usable(self) -> float:
@@ -252,6 +253,7 @@ def load_many(refs: list[dict]) -> list[Asset]:
             asset.zoom = _angka(ref.get("zoom"), 1.0, ZOOM_MIN, ZOOM_MAX)
             asset.cx = _angka(ref.get("cx"), 0.5, 0.0, 1.0)
             asset.cy = _angka(ref.get("cy"), 0.5, 0.0, 1.0)
+            asset.thumb = bool(ref.get("thumb"))
         if isinstance(ref, dict) and asset.kind == "video":
             asset.trim_start = max(0.0, min(float(ref.get("start") or 0), asset.duration))
             end = float(ref.get("end") or 0)

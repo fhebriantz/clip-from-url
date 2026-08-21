@@ -61,10 +61,11 @@ Menjalankan ulang setelah itu hanya butuh beberapa detik.
 3. Tunggu 30-90 detik
 4. Video muncul di daftar Riwayat, bisa diputar dan diunduh
 
-Hasilnya tersimpan di `data/output/<id-job>/`, berisi dua berkas:
+Hasilnya tersimpan di `data/output/<id-job>/`, berisi tiga berkas:
 
 - `<nama-produk>.mp4` - videonya
 - `<nama-produk>.txt` - caption, hashtag, dan naskah narasinya
+- `<nama-produk>.jpg` - sampul 3:4 untuk thumbnail unggahan
 
 ## Semua kolom di UI
 
@@ -77,7 +78,7 @@ supaya nyaman dipakai dari layar HP.
 | **URL produk** | tidak, kalau Nama produk dan aset diisi | Shopee, Tokopedia, atau tautan share TikTok Shop |
 | **Nama produk** | tidak | Biasanya terbaca sendiri dari alamatnya |
 | **Harga** | tidak | Isi `59000` atau `Rp59.000`. Wajib untuk TikTok Shop |
-| **Aset sendiri** | tidak | Gambar atau klip video. Klip punya slider trim; semuanya bisa dipotong dengan geser dan zoom |
+| **Aset sendiri** | tidak | Gambar atau klip video. Klip punya slider trim; semuanya bisa dipotong dengan geser dan zoom, dan gambar bisa dipilih jadi sampul |
 | **Deskripsi sendiri** | tidak | Kalau diisi, menggantikan deskripsi dari halaman |
 | **Baca dari tangkapan layar** | tidak | Screenshot deskripsi produk, teksnya diketik ulang oleh AI |
 | **Target durasi** | ya | 15-60 detik |
@@ -200,6 +201,40 @@ perbesarannya ikut dua kali lipat.
 Angka perbesarannya ditampilkan di kartu aset dan ikut berubah tiap kali rasio
 atau zoom-nya diganti. Di atas 3,5x tulisannya berubah kuning - masih bisa
 dipakai, tapi hasilnya akan kelihatan lembut.
+
+### Sampul untuk thumbnail
+
+Tiap video ikut menghasilkan satu berkas `.jpg` **3:4 tegak** (1080x1440) -
+rasio yang dipakai grid Instagram dan galeri TikTok, jadi tidak terpotong di
+feed.
+
+Sumbernya dipilih sendiri: di tiap aset **gambar** ada tombol **Pilih untuk
+sampul**, dan yang terpilih cuma satu. Kalau tidak dipilih apa pun, gambar
+pertama yang dipakai. Pengaturan zoom dan geser dari aset itu ikut terpakai,
+jadi bagian yang kamu bidik untuk video juga jadi bidikan sampulnya.
+
+Teksnya tidak perlu diketik: judulnya memakai **hook yang sama** dengan kartu
+pembuka di videonya, dan harganya memakai penyebutan kabur yang sama
+("90 ribuan"). Keduanya sudah ada dari pembuatan naskah, jadi sampul ini
+**tidak menambah satu pun permintaan kuota**.
+
+#### Kenapa templatnya tetap, bukan digenerate AI
+
+Dua alasan, dan keduanya terukur:
+
+1. **Model gambar Gemini tidak ada di kuota gratis.** Dicoba langsung ke
+   `gemini-3-pro-image-preview`, jawabannya `429 RESOURCE_EXHAUSTED` - jatahnya
+   nol tanpa penagihan aktif.
+2. **Gambar generatif justru merusak kerapian feed.** Hasilnya berbeda-beda tiap
+   kali, sedangkan yang bikin deretan unggahan terlihat satu keluarga adalah
+   bentuk yang selalu sama.
+
+Jadi susunannya dikunci: foto memenuhi bingkai, bayangan menggelap ke bawah
+supaya teks terbaca di atas foto apa pun, garis aksen kecil, lalu judul dan
+harga rata kiri di margin yang sama. Fontnya sama dengan kartu hook di videonya,
+supaya sampul dan isinya terlihat satu paket. Judul sepanjang apa pun tetap
+duduk di garis bawah yang sama - posisinya dihitung dari sisi bawah, bukan dari
+atas.
 
 ## Kapan tautan produk dibuka
 

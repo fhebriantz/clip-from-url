@@ -504,9 +504,19 @@ function cropCtl(a) {
   // Gambar sumbernya utuh; yang menentukan bagian mana yang terlihat adalah
   // ukuran dan posisinya di dalam panggung, diatur lewat gaya inline.
   const sumber = a.kind === "video" ? frameUrl(a, a.start) : `/api/assets/${a.id}/file`;
+  // Hanya gambar yang bisa jadi sampul; mengambil frame dari klip butuh langkah
+  // tambahan dan hasilnya jarang sebagus foto produk yang dipilih sendiri.
+  const sampul = a.kind === "image" ? `
+    <div class="crop-baris">
+      <span class="crop-lbl">Sampul</span>
+      <button type="button" data-thumb="${esc(a.id)}"
+              class="chip${a.thumb ? " aktif" : ""}">
+        ${a.thumb ? "Dipakai jadi sampul" : "Pilih untuk sampul"}</button>
+    </div>` : "";
   return `<div class="crop">
     <div class="crop-baris"><span class="crop-lbl">Potong</span>
       ${RASIO.map(btn).join("")}</div>
+    ${sampul}
     <div class="crop-panggung" id="panggung-${esc(a.id)}" data-geser="${esc(a.id)}"
          title="Seret untuk menggeser">
       <img id="cropimg-${esc(a.id)}" src="${sumber}" alt="" draggable="false">
@@ -668,7 +678,14 @@ async function unggahAset(files) {
     // Nilai trim awal: klip utuh.
     ASSETS = ASSETS.concat(body.map((a) => ({
       ...a, start: 0, end: a.duration, crop: "asli", zoom: 1, cx: 0.5, cy: 0.5,
+      thumb: false,
     })));
+    // Kalau belum ada yang dipilih, gambar pertama dipakai supaya sampulnya
+    // tetap terbuat tanpa perlu diklik dulu.
+    if (!ASSETS.some((a) => a.thumb)) {
+      const g = ASSETS.find((a) => a.kind === "image");
+      if (g) g.thumb = true;
+    }
     renderAssets();
     errEl.textContent = "";
   } catch (err) {
@@ -708,6 +725,18 @@ document.addEventListener("paste", (e) => {
   e.preventDefault();
   if (OCR) bukaOcr(gambar[0]);   // penanda area sedang terbuka: ganti gambarnya
   else unggahAset(gambar);
+});
+
+// Sampul cuma satu per video, jadi memilih satu aset otomatis melepas yang lain.
+$("assetList").addEventListener("click", (e) => {
+  const id = e.target.dataset?.thumb;
+  if (!id) return;
+  const a = ASSETS.find((x) => x.id === id);
+  if (!a) return;
+  const nyala = !a.thumb;
+  ASSETS.forEach((x) => { x.thumb = false; });
+  a.thumb = nyala;
+  renderAssets();
 });
 
 $("assetList").addEventListener("click", (e) => {
@@ -872,6 +901,7 @@ $("formProduct").addEventListener("submit", (e) => {
     assets: ASSETS.map((a) => ({
       id: a.id, start: a.start ?? 0, end: a.end ?? 0,
       crop: a.crop ?? "asli", zoom: a.zoom ?? 1, cx: a.cx ?? 0.5, cy: a.cy ?? 0.5,
+      thumb: !!a.thumb,
     })),
     description: $("pDesc").value.trim(),
   }, "product");

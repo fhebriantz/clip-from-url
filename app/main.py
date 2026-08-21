@@ -88,6 +88,7 @@ class AssetRef(BaseModel):
     zoom: float = Field(default=1.0, ge=1.0, le=4.0)
     cx: float = Field(default=0.5, ge=0.0, le=1.0)
     cy: float = Field(default=0.5, ge=0.0, le=1.0)
+    thumb: bool = False
 
     @field_validator("id")
     @classmethod

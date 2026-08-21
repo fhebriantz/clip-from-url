@@ -369,6 +369,86 @@ def _render_hook_card(image: Path, duration: float, text: str, out: Path, work: 
     ])
 
 
+# Sampul dibuat 3:4 tegak - rasio yang dipakai grid Instagram dan galeri TikTok,
+# jadi tidak terpotong di feed. Ukurannya, warna, dan letak teksnya sengaja
+# dikunci: sampul yang selalu sama bentuknya membuat deretan unggahan terlihat
+# satu keluarga, dan itu justru tidak bisa dijamin oleh gambar yang digenerate.
+THUMB_W, THUMB_H = 1080, 1440
+THUMB_AKSEN = "0x00D6B4"
+THUMB_MARGIN = 72
+THUMB_JUDUL_MAKS = 92
+THUMB_JUDUL_MIN = 54
+# Lebar rata-rata satu huruf Montserrat Bold, sebagai pecahan dari fontsize.
+_LEBAR_HURUF = 0.55
+
+
+def _ukuran_judul(baris: list[str]) -> int:
+    """Perbesar judul sebisanya, tapi jangan sampai baris terpanjang meluber."""
+    panjang = max((len(b) for b in baris), default=1)
+    muat = int((THUMB_W - 2 * THUMB_MARGIN) / max(1, panjang) / _LEBAR_HURUF)
+    return max(THUMB_JUDUL_MIN, min(THUMB_JUDUL_MAKS, muat))
+
+
+def _render_thumbnail(image: Path, judul: str, harga: str, out: Path, work: Path,
+                      potong: str = "") -> None:
+    """Sampul 3:4 dari satu gambar aset, dengan template tetap dan teks.
+
+    Dibuat dengan FFmpeg, bukan model gambar: model gambar Gemini tidak ada di
+    kuota gratis, dan hasilnya akan berbeda-beda tiap kali - kebalikan dari feed
+    yang rapi. Fontnya sama dengan kartu hook di videonya supaya sampul dan isi
+    terlihat satu paket.
+    """
+    font = _font()
+    baris = _wrap(judul, width=16).split("\n") if judul.strip() else []
+    fs = _ukuran_judul(baris)
+    spasi = int(fs * 0.18)
+
+    # Semua diletakkan dari sisi bawah supaya jumlah baris berapa pun tetap rapi.
+    dasar = THUMB_H - THUMB_MARGIN
+    y_harga = dasar - 52 if harga else dasar
+    tinggi_judul = len(baris) * fs + max(0, len(baris) - 1) * spasi
+    y_judul = (y_harga - 30 if harga else dasar) - tinggi_judul
+    y_bar = y_judul - 40
+
+    potong_3x4 = potong or (
+        f"crop='min(iw,ih*0.75)':'min(ih,iw/0.75)':'(iw-ow)/2':'(ih-oh)/2'")
+    chain = [
+        f"[0:v]{potong_3x4},scale={THUMB_W}:{THUMB_H}:"
+        f"force_original_aspect_ratio=increase,crop={THUMB_W}:{THUMB_H}[bg]",
+        # Bayangan yang menggelap ke bawah, supaya teks terbaca di atas foto apa pun.
+        f"color=black:s={THUMB_W}x{THUMB_H},format=rgba,"
+        "geq=r=0:g=0:b=0:a='clip(255*0.95*(Y-H*0.38)/(H*0.62),0,255)'[sc]",
+        "[bg][sc]overlay=0:0[d]",
+        f"[d]drawbox=x={THUMB_MARGIN}:y={y_bar}:w=88:h=10:"
+        f"color={THUMB_AKSEN}@1:t=fill[a]",
+    ]
+    label = "a"
+    if font and baris:
+        berkas = work / "thumb-judul.txt"
+        berkas.write_text("\n".join(baris), encoding="utf-8")
+        chain.append(
+            f"[{label}]drawtext=fontfile='{_esc(font)}':textfile='{_esc(berkas)}':"
+            f"fontcolor=white:fontsize={fs}:line_spacing={spasi}:"
+            f"x={THUMB_MARGIN}:y={y_judul}[j]"
+        )
+        label = "j"
+    if font and harga.strip():
+        berkas = work / "thumb-harga.txt"
+        berkas.write_text(harga.strip(), encoding="utf-8")
+        chain.append(
+            f"[{label}]drawtext=fontfile='{_esc(font)}':textfile='{_esc(berkas)}':"
+            f"fontcolor={THUMB_AKSEN}:fontsize=52:"
+            f"x={THUMB_MARGIN}:y={y_harga}[h]"
+        )
+        label = "h"
+    chain.append(f"[{label}]null[v]")
+
+    run_ffmpeg([
+        "-i", str(image), "-filter_complex", ";".join(chain),
+        "-map", "[v]", "-frames:v", "1", "-q:v", "3", str(out),
+    ])
+
+
 def _gabung(listing: Path, audios: list[Path], pads: list[float], out: Path) -> None:
     """Sambung semua potongan jadi satu video.
 
@@ -651,6 +731,23 @@ def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:
     # sendiri kalau mau.
     baris_narasi = [hook_text] if hook_text else []
     baris_narasi += [sc["narration"] for sc in scenes]
+    # Sampul: dari aset yang ditandai, kalau tidak ada dari gambar pertama yang
+    # ada. Klip video dilewati - mengambil frame darinya butuh langkah tambahan
+    # dan hasilnya jarang sebagus foto produk yang dipilih sendiri.
+    sumber_thumb = next((m for m in media if m.thumb and m.kind == "image"), None)
+    if sumber_thumb is None:
+        sumber_thumb = next((m for m in media if m.kind == "image"), None)
+    if sumber_thumb is not None:
+        try:
+            _render_thumbnail(
+                sumber_thumb.path, script["hook"], vague or product.price_text or "",
+                out_dir / f"{Path(filename).stem}.jpg", work,
+                potong=assets.crop_filter("3:4", sumber_thumb.zoom,
+                                          sumber_thumb.cx, sumber_thumb.cy),
+            )
+        except Exception as exc:  # noqa: BLE001 - sampul gagal tidak boleh membatalkan video
+            report(96, f"Sampul gagal dibuat: {str(exc)[:80]}")
+
     catatan = out_dir / f"{Path(filename).stem}.txt"
     catatan.write_text(
         "CAPTION UNTUK DIPOSTING\n"
