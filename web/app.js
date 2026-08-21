@@ -103,9 +103,10 @@ function cekPetunjukTiktok() {
   const el = $("petunjukTiktok");
   el.hidden = !tiktok;
   if (tiktok) {
-    el.innerHTML = "TikTok Shop tidak memberi deskripsi produk, jadi naskah hanya "
-      + "bersandar pada nama produknya. Isi <b>Harga</b> dan <b>Deskripsi sendiri</b> "
-      + "di Opsi lanjutan supaya hasilnya jauh lebih tepat sasaran.";
+    el.innerHTML = "TikTok Shop hanya memberi <b>1 gambar</b>, tanpa harga dan tanpa "
+      + "deskripsi - galeri di halaman produknya tidak bisa dibaca. Unggah "
+      + "<b>aset sendiri</b> supaya videonya tidak mengulang satu foto terus, dan isi "
+      + "<b>Harga</b> serta <b>Deskripsi sendiri</b> di Opsi lanjutan.";
   }
 }
 

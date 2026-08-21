@@ -151,6 +151,15 @@ Domain tautan pendek yang dikenali: `s.shopee.co.id`, `shope.ee`, `tokopedia.lin
   URL yang diketik manual tidak memuat data produk. Harga selalu manual, dan
   **deskripsi produk tidak tersedia sama sekali**.
 
+TikTok Shop juga hanya memberi **satu gambar** - yang tertanam di parameter
+`og_info` tautan share. Galeri slider di halaman produk tidak bisa dibaca karena
+halamannya diblokir captcha, dan tidak ada endpoint data publik (sudah diuji: semua
+membalas 404 atau 502). Alamat gambar lainnya berupa hash acak yang tidak bisa
+ditebak dari gambar pertama.
+
+Praktisnya: **unggah aset sendiri** untuk produk TikTok Shop. Tanpa itu satu foto
+akan diputar ulang di semua scene.
+
 Karena TikTok Shop tidak memberi deskripsi, naskah hanya bisa bersandar pada nama
 produknya. Aplikasi sudah dibatasi supaya tidak mengarang di luar itu - kalau nama
 produknya "Kemeja Pria Slimfit Lapis Furing Premium", naskah boleh membahas
