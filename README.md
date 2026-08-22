@@ -495,6 +495,26 @@ Jalur resminya ada (`/v2/post/publish/inbox/video/init/` dengan scope
 tertunda per 24 jam** - di bawah kebutuhan harian kalau kamu memposting lebih dari
 itu. Folder tersinkron tidak punya batas semacam itu.
 
+## Teks dijaga di dalam area aman
+
+Antarmuka TikTok menumpuk di atas videomu: nama akun dan caption memakan sekitar
+**400px paling bawah**, deretan tombol suka/komentar/bagikan sekitar **180px di
+tepi kanan**, dan bilah atas sekitar **140px**. Panduan 2026 menyebut area teks
+yang aman kira-kira **1080x1420**. Shopee Video dan Reels menumpuknya di tempat
+yang mirip.
+
+Semua teks di video dijaga di dalam area itu:
+
+| Bagian | Aturan |
+|---|---|
+| Subtitle | Dasar teks 500px dari sisi bawah, jadi berakhir di 1420px dari atas |
+| Subtitle | Dibungkus 24 huruf per baris supaya tidak masuk ke tombol kanan |
+| Kartu hook | Dibungkus 14 huruf, dan fontnya mengecil sendiri kalau baris terpanjangnya melewati 700px |
+
+Kalau kamu mengubah angka-angka ini, patokannya ada di `SUBTITLE_DASAR`,
+`SUBTITLE_LEBAR_KATA`, dan `HOOK_LEBAR_AMAN` di
+`app/pipeline/product_video.py`.
+
 ## Musik latar sengaja tidak ada
 
 Algoritma TikTok memberi jangkauan lebih ke video yang memakai *trending sound* dari

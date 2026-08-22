@@ -189,6 +189,17 @@ def _zoom_expr(duration: float, idx: int) -> str:
     return f"z='{1 + ZOOM_RANGE}-{ZOOM_RANGE}*on/{frames}'"
 
 
+# Antarmuka TikTok menumpuk di atas video: nama akun dan caption memakan sekitar
+# 400px paling bawah, dan deretan tombol suka/komentar/bagikan sekitar 180px di
+# tepi kanan. Panduan 2026 menyebut area teks yang aman kira-kira 1080x1420 -
+# jadi teks apa pun harus berakhir sebelum 1420px dari atas, atau tertutup.
+# Shopee Video dan Reels menumpuknya di tempat yang mirip.
+SUBTITLE_DASAR = 500          # jarak dasar teks ke sisi bawah bingkai
+SUBTITLE_LEBAR_KATA = 24      # dipersempit dari 30 supaya tidak masuk ke tombol kanan
+HOOK_LEBAR_AMAN = 700         # lebar terpakai kartu hook, di dalam 1080 dikurangi tombol
+HOOK_FS_MAKS, HOOK_FS_MIN = 92, 58
+
+
 def _layout_chain(layout: str, potong: str = "") -> tuple[list[str], dict]:
     """Rantai filter latar + gaya subtitle untuk satu tata letak.
 
@@ -209,7 +220,7 @@ def _layout_chain(layout: str, potong: str = "") -> tuple[list[str], dict]:
             "boxblur=40:3,eq=brightness=0.08:saturation=0.45[bg]",
             f"{fg}scale={int(W * 0.84)}:-1[fg]",
             "[bg][fg]overlay=(W-w)/2:(H-h)/2-90[base]",
-        ], {"fontcolor": "black", "boxcolor": "0xFFD400@0.95", "y": "h-text_h-330"})
+        ], {"fontcolor": "black", "boxcolor": "0xFFD400@0.95", "y": f"h-text_h-{SUBTITLE_DASAR}"})
 
     if layout == "panel-bawah":
         return (awal + [
@@ -217,14 +228,14 @@ def _layout_chain(layout: str, potong: str = "") -> tuple[list[str], dict]:
             "boxblur=34:2,eq=brightness=-0.28:saturation=0.7[bg]",
             f"{fg}scale={int(W * 0.88)}:-1[fg]",
             "[bg][fg]overlay=(W-w)/2:(H-h)/2-210[base]",
-        ], {"fontcolor": "white", "boxcolor": "black@0.72", "y": "h-text_h-260"})
+        ], {"fontcolor": "white", "boxcolor": "black@0.72", "y": f"h-text_h-{SUBTITLE_DASAR}"})
 
     return (awal + [
         f"{bg}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
         "boxblur=30:2,eq=brightness=-0.10[bg]",
         f"{fg}scale={int(W * 0.91)}:-1[fg]",
         "[bg][fg]overlay=(W-w)/2:(H-h)/2[base]",
-    ], {"fontcolor": "white", "boxcolor": "black@0.55", "y": "h-text_h-360"})
+    ], {"fontcolor": "white", "boxcolor": "black@0.55", "y": f"h-text_h-{SUBTITLE_DASAR}"})
 
 
 def _render_scene(image: Path, duration: float, caption: str, out: Path, work: Path,
@@ -241,7 +252,7 @@ def _render_scene(image: Path, duration: float, caption: str, out: Path, work: P
     if caption.strip() and font:
         # textfile menghindari neraka escaping tanda kutip & titik dua di teks.
         cap_file = work / f"cap-{idx:02d}.txt"
-        cap_file.write_text(_wrap(caption), encoding="utf-8")
+        cap_file.write_text(_wrap(caption, width=SUBTITLE_LEBAR_KATA), encoding="utf-8")
         chain.append(
             f"{last}drawtext=fontfile='{_esc(font)}':textfile='{_esc(cap_file)}':"
             f"fontcolor={style['fontcolor']}:fontsize=52:line_spacing=12:"
@@ -312,7 +323,7 @@ def _render_clip(asset, duration: float, caption: str, out: Path, work: Path,
     font = _font()
     if caption.strip() and font:
         cap_file = work / f"cap-{idx:02d}.txt"
-        cap_file.write_text(_wrap(caption), encoding="utf-8")
+        cap_file.write_text(_wrap(caption, width=SUBTITLE_LEBAR_KATA), encoding="utf-8")
         chain.append(
             f"{last}drawtext=fontfile='{_esc(font)}':textfile='{_esc(cap_file)}':"
             f"fontcolor={style['fontcolor']}:fontsize=52:line_spacing=12:"
@@ -351,10 +362,14 @@ def _render_hook_card(image: Path, duration: float, text: str, out: Path, work: 
     ]
     if font and text.strip():
         card = work / "hook-card.txt"
-        card.write_text(_wrap(text, width=16), encoding="utf-8")
+        # Lebar 14 huruf menjaga baris terpanjang tetap lepas dari deretan tombol
+        # di tepi kanan; pembagiannya sama dengan sampul supaya tidak ada kata
+        # yang tertinggal sendirian di baris terakhir.
+        baris_hook = _baris_judul(text, dasar=14, maks=22)
+        card.write_text("\n".join(baris_hook), encoding="utf-8")
         chain.append(
             f"[zm]drawtext=fontfile='{_esc(font)}':textfile='{_esc(card)}':"
-            f"fontsize=92:line_spacing=18:{style['text']}:"
+            f"fontsize={_ukuran_hook(baris_hook)}:line_spacing=18:{style['text']}:"
             "x=(w-text_w)/2:y=(h-text_h)/2[v]"
         )
     else:
@@ -400,6 +415,18 @@ def _baris_judul(teks: str, dasar: int = 16, maks: int = 26) -> list[str]:
         if len(baris) == 1 or len(baris[-1]) >= 0.4 * max(len(b) for b in baris):
             return baris
     return _wrap(teks, width=maks).split("\n")
+
+
+def _ukuran_hook(baris: list[str]) -> int:
+    """Ukuran font kartu hook, dikecilkan kalau barisnya kepanjangan.
+
+    Aturan anti-yatim boleh melebarkan baris, dan baris yang melebar bisa
+    menembus deretan tombol di tepi kanan. Fontnya yang mengalah, bukan
+    susunannya - hook tetap terbaca utuh dan tetap di dalam area aman.
+    """
+    panjang = max((len(b) for b in baris), default=1)
+    muat = int(HOOK_LEBAR_AMAN / max(1, panjang) / _LEBAR_HURUF)
+    return max(HOOK_FS_MIN, min(HOOK_FS_MAKS, muat))
 
 
 def _ukuran_judul(baris: list[str]) -> int:
