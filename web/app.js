@@ -1100,12 +1100,61 @@ function kartuAdegan(a, i) {
   </li>`;
 }
 
+// Naskah yang sudah pernah dibuat disimpan permanen, terpisah dari cache yang
+// dibuang setelah 14 hari. Membukanya lagi tidak memakai kuota sama sekali -
+// berguna untuk merender ulang, atau melihat lagi daftar prompt gambarnya saat
+// mau menambah gambar yang kurang.
+let RIWAYAT = [];
+
+async function muatRiwayat(pilih) {
+  try {
+    RIWAYAT = await (await fetch("/api/content/riwayat")).json();
+  } catch { return; }
+  const sel = $("kRiwayat");
+  sel.innerHTML = '<option value="">- buat yang baru -</option>'
+    + RIWAYAT.map((r) => {
+        const tgl = (r.created_at || "").slice(0, 10);
+        // Model kadang menulis judul dengan garis bawah, misalnya
+        // "Misteri_Sinyal_Wow" - dirapikan hanya untuk ditampilkan.
+        const nama = (r.judul || r.topik || "(tanpa judul)").replace(/_/g, " ");
+        return `<option value="${esc(r.id)}">${esc(nama)} - ${esc(r.kategori || "?")} - ${tgl}</option>`;
+      }).join("");
+  if (pilih) sel.value = pilih;
+}
+
+$("kRiwayat").addEventListener("change", async (e) => {
+  const id = e.target.value;
+  const errEl = document.querySelector('[data-err="content"]');
+  if (!id) {
+    $("kRencana").hidden = true;
+    $("kNaskah").value = "";
+    $("kJudul").value = "";
+    return;
+  }
+  errEl.textContent = "";
+  try {
+    const res = await fetch(`/api/content/riwayat/${encodeURIComponent(id)}`);
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.detail || "Gagal memuat");
+    $("kNaskah").value = d.narasi || "";
+    $("kJudul").value = d.judul || "";
+    tampilRencana(d);
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+muatRiwayat();
+
 function tampilRencana(d) {
   const tagar = (d.hashtags || []).map((t) => "#" + String(t).replace(/^#/, "")).join(" ");
   $("kRencana").hidden = false;
   $("kRencana").innerHTML = `
     <h3>${esc(d.judul || "Rencana konten")}</h3>
     ${d.dari_simpanan ? '<p class="petunjuk">Diambil dari simpanan, tanpa memakai kuota.</p>' : ""}
+    ${d.id ? `<p class="petunjuk">Tersimpan di <b>Naskah tersimpan</b> - bisa dibuka
+      lagi kapan pun untuk dirender ulang.
+      <button type="button" class="link-btn" data-hapusrencana="${esc(d.id)}">Hapus dari simpanan</button></p>` : ""}
     <p class="rencana-hook">${esc(d.hook || "")}</p>
     <p class="petunjuk">Naskahnya sudah diisikan ke <b>Naskah sendiri</b> di Opsi
       lanjutan. Jangan diubah kalau mau videonya dibuat tanpa memakai kuota lagi.</p>
@@ -1164,6 +1213,13 @@ $("kRencana").addEventListener("click", (e) => {
 });
 
 $("kRencana").addEventListener("click", async (e) => {
+  const buang = e.target.dataset?.hapusrencana;
+  if (buang) {
+    await fetch(`/api/content/riwayat/${encodeURIComponent(buang)}`, { method: "DELETE" });
+    $("kRencana").hidden = true;
+    await muatRiwayat();
+    return;
+  }
   const i = e.target.dataset?.salinbtn;
   if (i === undefined) return;
   const teks = $("kRencana").querySelectorAll("[data-salin]")[Number(i)]?.dataset.salin;
@@ -1197,10 +1253,11 @@ $("formContent").addEventListener("submit", async (e) => {
   try {
     const res = await fetch("/api/content/rencana", {
       method: "POST", headers: { "Content-Type": "application/json" },
+      // adegan 0 berarti "hitung sendiri dari durasi videonya".
       body: JSON.stringify({
         category: $("kKategori").value,
         topic: $("kTopik").value.trim(),
-        adegan: 6,
+        adegan: 0,
       }),
     });
     const d = await res.json();
@@ -1210,6 +1267,7 @@ $("formContent").addEventListener("submit", async (e) => {
     $("kNaskah").value = d.narasi || "";
     $("kJudul").value = d.judul || "";
     tampilRencana(d);
+    await muatRiwayat(d.id);
   } catch (err) {
     errEl.textContent = err.message;
   } finally {

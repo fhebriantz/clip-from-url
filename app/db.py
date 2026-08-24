@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS cache (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_cache_jenis ON cache(jenis);
+CREATE TABLE IF NOT EXISTS rencana (
+    id         TEXT PRIMARY KEY,
+    judul      TEXT NOT NULL DEFAULT '',
+    kategori   TEXT NOT NULL DEFAULT '',
+    topik      TEXT NOT NULL DEFAULT '',
+    isi        TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rencana_baru ON rencana(created_at DESC);
 """
 
 
@@ -302,3 +311,45 @@ def delete_job(job_id: str) -> None:
         _db().execute("DELETE FROM clips WHERE job_id=?", (job_id,))
         _db().execute("DELETE FROM jobs WHERE id=?", (job_id,))
         _db().commit()
+
+
+# ------------------------------------------------------------------ rencana
+
+# Naskah dan daftar gambarnya disimpan terpisah dari cache biasa. Cache dibuang
+# sendiri setelah 14 hari, sedangkan ini catatan kerja: naskah yang sudah dipakai
+# harus bisa dibuka lagi berbulan-bulan kemudian untuk dirender ulang, dan daftar
+# prompt gambarnya dipakai lagi saat menambah atau mengganti gambar.
+
+
+def rencana_simpan(judul: str, kategori: str, topik: str, isi: str) -> str:
+    rid = uuid.uuid4().hex[:12]
+    with _lock:
+        _db().execute(
+            "INSERT INTO rencana (id, judul, kategori, topik, isi, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (rid, judul[:200], kategori, topik[:300], isi, _now()),
+        )
+        _db().commit()
+    return rid
+
+
+def rencana_daftar(batas: int = 50) -> list[dict]:
+    with _lock:
+        rows = _db().execute(
+            "SELECT id, judul, kategori, topik, created_at FROM rencana "
+            "ORDER BY created_at DESC LIMIT ?", (batas,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def rencana_ambil(rid: str) -> dict | None:
+    with _lock:
+        row = _db().execute("SELECT * FROM rencana WHERE id=?", (rid,)).fetchone()
+    return dict(row) if row else None
+
+
+def rencana_hapus(rid: str) -> bool:
+    with _lock:
+        cur = _db().execute("DELETE FROM rencana WHERE id=?", (rid,))
+        _db().commit()
+    return cur.rowcount > 0

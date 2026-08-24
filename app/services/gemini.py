@@ -478,20 +478,35 @@ Aturan bentuknya:
 - Tutup dengan satu pertanyaan yang memancing komentar, bukan ajakan berlangganan.
 - JANGAN menjual apa pun. Ini bukan iklan.
 
-Buat {adegan} entri `adegan` berurutan mengikuti alur ceritanya. Untuk tiap
-adegan, tentukan sendiri gambarnya sebaiknya DICARI atau DIBUAT:
+Buat TEPAT {adegan} entri `adegan`, berurutan mengikuti alur ceritanya. Jumlah
+ini banyak dengan sengaja: satu gambar hanya bertahan sekitar empat detik di
+layar, dan gambar yang diulang-ulang membuat penonton berhenti menonton.
+Setiap adegan harus menampilkan sesuatu yang BERBEDA - sudut lain, jarak lain,
+momen lain dalam cerita. Jangan ada dua adegan yang isinya pada dasarnya sama.
 
-- Pakai `cara: "cari"` untuk apa pun yang NYATA dan bisa diperiksa orang: tokoh
-  sungguhan, tempat sungguhan, benda atau produk sungguhan, dokumen, arsip, dan
-  foto peristiwa yang benar-benar terjadi. Gambar buatan untuk hal semacam ini
-  berisiko menyesatkan, karena penonton akan mengiranya foto asli.
-  `instruksi` diisi kata kunci pencarian yang singkat dan spesifik.
-- Pakai `cara: "buat"` untuk yang tidak bisa difoto atau memang hanya ilustrasi:
-  suasana, konsep, penggambaran, adegan pengantar, atau visual abstrak.
-  `instruksi` diisi prompt lengkap bahasa Inggris, siap ditempel ke generator
-  gambar, menggambarkan satu bidikan tegak 9:16 yang sinematik dan tanpa teks.
+Untuk tiap adegan, tentukan gambarnya sebaiknya DIBUAT atau DICARI:
 
-Isi `alasan` dengan satu kalimat singkat kenapa cara itu yang dipilih.
+- **Utamakan `cara: "buat"`.** Ini pilihan bawaannya, dan sebaiknya dipakai
+  untuk sebagian besar adegan. Gambar buatan bisa dibikin persis sesuai
+  ceritanya, dan tidak membuat orang harus berburu foto satu per satu.
+- Pakai `cara: "cari"` HANYA kalau gambarnya wajib foto asli supaya tidak
+  menyesatkan: tokoh sungguhan yang disebut namanya, dokumen atau arsip
+  tertentu, foto peristiwa yang benar-benar terjadi, atau produk bermerek yang
+  bentuknya harus tepat. Kalau ragu, pilih "buat".
+
+Untuk `cara: "buat"`, tulis `instruksi` dalam bahasa Inggris sebagai prompt yang
+siap ditempel, dan buat hasilnya terlihat seperti FOTO SUNGGUHAN, bukan
+ilustrasi atau gambar digital. Sertakan di tiap prompt:
+- subjek dan apa yang sedang terjadi, spesifik
+- jarak dan sudut bidikan (close-up, wide shot, low angle, over the shoulder)
+- cahayanya (golden hour, overcast, harsh midday sun, dim interior)
+- kesan lensa dan kamera (shot on 35mm, shallow depth of field, slight film grain)
+- diakhiri: photorealistic, vertical 9:16, no text
+Hindari kata yang menjatuhkan hasilnya jadi gambar digital seperti "illustration",
+"3D render", "digital art", "concept art", atau "cinematic lighting" berlebihan.
+
+Untuk `cara: "cari"`, `instruksi` diisi kata kunci pencarian singkat dan
+spesifik. Isi `alasan` dengan satu kalimat kenapa cara itu yang dipilih.
 """
 
 

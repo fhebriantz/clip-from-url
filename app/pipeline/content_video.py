@@ -286,6 +286,18 @@ def _satukan(video: Path, audio: Path, ass: Path, out: Path,
 KATA_PER_DETIK = 2.56
 
 
+def adegan_ideal(durasi: float = DURASI) -> int:
+    """Berapa gambar yang sebaiknya disiapkan untuk durasi segini.
+
+    Dihitung dari panjang rata-rata satu gambar di layar, bukan angka tetap.
+    Sebelumnya rencananya selalu meminta 6 gambar sementara videonya memakai 21
+    scene - jadi tiap gambar muncul tiga sampai empat kali, dan itu yang bikin
+    videonya terasa berputar-putar.
+    """
+    rerata = (DETIK_PER_GAMBAR_MIN + DETIK_PER_GAMBAR_MAKS) / 2
+    return max(6, min(24, round(durasi / rerata)))
+
+
 def run(job_id: str, params: dict, report, add_clip) -> str:
     """Titik masuk dari antrian job: siapkan naskah, lalu rangkai videonya."""
     naskah = str(params.get("script") or "").strip()
@@ -296,7 +308,7 @@ def run(job_id: str, params: dict, report, add_clip) -> str:
             topik=str(params.get("topic") or ""),
             kategori=str(params.get("category") or "anomali"),
             kata=int(DURASI * KATA_PER_DETIK),
-            adegan=6,
+            adegan=adegan_ideal(),
             on_status=lambda m: report(6, m),
         )
         naskah = hasil["narasi"]

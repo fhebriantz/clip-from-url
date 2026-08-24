@@ -240,7 +240,7 @@ def content_kategori() -> dict[str, Any]:
 class RencanaRequest(BaseModel):
     category: Literal["misteri", "teknologi", "scifi", "anomali"] = "anomali"
     topic: str = Field(default="", max_length=300)
-    adegan: int = Field(default=6, ge=3, le=12)
+    adegan: int = Field(default=0, ge=0, le=24)   # 0 = hitung dari durasi
 
 
 @app.post("/api/content/rencana")
@@ -254,8 +254,9 @@ def content_rencana(req: RencanaRequest) -> dict[str, Any]:
     """
     if not GEMINI_API_KEY:
         raise HTTPException(400, "GEMINI_API_KEY belum diisi di berkas .env")
+    adegan = req.adegan or content_video.adegan_ideal()
     kunci = "rencana:" + hashlib.sha256(
-        f"{req.category}|{req.topic.strip().lower()}|{req.adegan}".encode()
+        f"{req.category}|{req.topic.strip().lower()}|{adegan}".encode()
     ).hexdigest()[:32]
     tersimpan = db.cache_ambil(kunci)
     if tersimpan:
@@ -264,12 +265,36 @@ def content_rencana(req: RencanaRequest) -> dict[str, Any]:
         hasil = gemini_service.tulis_naskah_konten(
             topik=req.topic, kategori=req.category,
             kata=int(content_video.DURASI * content_video.KATA_PER_DETIK),
-            adegan=req.adegan,
+            adegan=adegan,
         )
     except Exception as exc:  # noqa: BLE001 - pesan mentah tidak ramah
         raise HTTPException(502, f"Gagal menulis rencana: {str(exc)[:150]}") from exc
-    db.cache_simpan(kunci, "rencana", json.dumps(hasil, ensure_ascii=False))
-    return {**hasil, "dari_simpanan": False}
+    isi = json.dumps(hasil, ensure_ascii=False)
+    db.cache_simpan(kunci, "rencana", isi)
+    # Disimpan juga sebagai catatan kerja yang tidak ikut kedaluwarsa, supaya
+    # naskah dan daftar prompt gambarnya bisa dibuka lagi kapan pun.
+    rid = db.rencana_simpan(str(hasil.get("judul") or ""), req.category, req.topic, isi)
+    return {**hasil, "dari_simpanan": False, "id": rid}
+
+
+@app.get("/api/content/riwayat")
+def content_riwayat() -> list[dict[str, Any]]:
+    """Naskah dan daftar gambar yang pernah dibuat, terbaru lebih dulu."""
+    return db.rencana_daftar()
+
+
+@app.get("/api/content/riwayat/{rid}")
+def content_riwayat_satu(rid: str) -> dict[str, Any]:
+    baris = db.rencana_ambil(rid)
+    if not baris:
+        raise HTTPException(404, "Rencana tidak ditemukan")
+    return {**json.loads(baris["isi"]), "id": rid, "dari_simpanan": True,
+            "created_at": baris["created_at"]}
+
+
+@app.delete("/api/content/riwayat/{rid}")
+def content_riwayat_hapus(rid: str) -> dict[str, bool]:
+    return {"dihapus": db.rencana_hapus(rid)}
 
 
 @app.post("/api/jobs/content")

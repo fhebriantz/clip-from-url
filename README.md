@@ -558,8 +558,13 @@ Kosongkan bagian gambar, dan tombolnya berubah jadi **Buat naskah + daftar
 gambar**. Yang keluar bukan video, tapi rencananya: naskah lengkap plus daftar
 bernomor berisi gambar apa saja yang harus kamu siapkan.
 
+Jumlah gambarnya **mengikuti jumlah scene video**, bukan angka tetap - sekitar
+18 untuk video 85 detik. Sebelumnya rencananya selalu meminta 6 gambar padahal
+videonya memakai 21 scene, jadi tiap gambar muncul tiga sampai empat kali dan
+videonya terasa berputar-putar.
+
 Tiap gambar diberi **cara** yang berbeda, dan Gemini sendiri yang memutuskan
-mana yang mana:
+mana yang mana - dengan **"buat" sebagai pilihan bawaannya**:
 
 | Cara | Dipakai untuk | Isi instruksinya |
 |---|---|---|
@@ -567,8 +572,17 @@ mana yang mana:
 | **buat pakai AI** | Suasana, konsep, ilustrasi, visual yang tidak bisa difoto | Prompt lengkap bahasa Inggris |
 
 Pemisahan ini bukan sekadar kerapian. Gambar buatan AI untuk hal yang nyata
-berisiko menyesatkan - penonton akan mengiranya foto asli. Jadi yang nyata
-dicari, yang ilustratif dibuat.
+berisiko menyesatkan - penonton akan mengiranya foto asli. Jadi "cari" dipakai
+hanya kalau gambarnya wajib foto asli; selebihnya dibuat.
+
+Prompt untuk gambar buatan diminta menghasilkan sesuatu yang terlihat seperti
+**foto sungguhan**, bukan ilustrasi: menyebut jarak dan sudut bidikan, arah
+cahaya, kesan lensa, lalu ditutup `photorealistic, vertical 9:16, no text`. Kata
+yang menjatuhkan hasilnya jadi gambar digital - *illustration*, *3D render*,
+*digital art*, *concept art* - dilarang.
+
+Terukur pada satu rencana 18 adegan: 17 dibuat AI dan 1 dicari, 17 dari 17
+prompt memuat ketiga penutupnya, dan **nol** yang memakai kata terlarang itu.
 
 Contoh keluarannya untuk topik sepeda listrik roda tiga:
 
@@ -583,6 +597,18 @@ Gambar 3  [buat pakai AI]     Kekuatan menanjak dan muatan penuh
 
 Tiap instruksi punya tombol **Salin**, dan menyentuh kotaknya menyorot seluruh
 teks - jadi tetap bisa disalin manual kalau browser menolak menyalin otomatis.
+
+### Naskah tersimpan
+
+Tiap rencana yang dibuat langsung disimpan permanen dan muncul di dropdown
+**Naskah tersimpan** di paling atas tab. Memilih salah satunya memuat kembali
+naskah, judul, dan seluruh daftar prompt gambarnya - **tanpa memakai kuota sama
+sekali**.
+
+Gunanya dua: merender ulang video yang sama dengan gambar berbeda, dan membuka
+lagi daftar promptnya saat mau menambah gambar yang kurang. Simpanan ini
+terpisah dari cache biasa yang dibuang setelah 14 hari - catatan kerja tidak
+ikut kedaluwarsa. Ada tombol **Hapus dari simpanan** kalau sudah tidak dipakai.
 
 **Naskahnya langsung diisikan** ke kolom *Naskah sendiri* di Opsi lanjutan.
 Selama tidak kamu ubah, tahap kedua memakai naskah yang sama dan **tidak
