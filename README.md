@@ -581,8 +581,30 @@ cahaya, kesan lensa, lalu ditutup `photorealistic, vertical 9:16, no text`. Kata
 yang menjatuhkan hasilnya jadi gambar digital - *illustration*, *3D render*,
 *digital art*, *concept art* - dilarang.
 
-Terukur pada satu rencana 18 adegan: 17 dibuat AI dan 1 dicari, 17 dari 17
-prompt memuat ketiga penutupnya, dan **nol** yang memakai kata terlarang itu.
+**Kamera dan lensanya wajib ada di setiap prompt**, dan dipilih menurut jarak
+bidikannya - bukan asal tempel: 100mm makro untuk detail sangat dekat, 85mm
+untuk wajah, 24mm untuk pemandangan luas, 35mm untuk bidikan biasa. Menempelkan
+lensa potret ke bidikan pemandangan justru menghasilkan gambar yang salah.
+
+Model tidak selalu menurut - pada percobaan pertama hanya 6 dari 17 prompt yang
+menyebutnya. Jadi ada jaring pengaman di kode: prompt yang belum menyebut kamera
+**dilengkapi otomatis** dengan lensa yang cocok, dibaca dari kata-kata di prompt
+itu sendiri. Rencana lama yang sudah tersimpan ikut terkoreksi saat dibuka lagi,
+tanpa memakai kuota.
+
+Terukur pada satu rencana 18 adegan:
+
+| Pemeriksaan | Hasil |
+|---|---|
+| Dibuat AI vs dicari | 16 : 2 |
+| Menyebut kamera/lensa | **16/16** |
+| `photorealistic` | 16/16 |
+| `vertical 9:16` | 16/16 |
+| `no text` | 16/16 |
+| Kata terlarang | **0/16** |
+
+Sebaran lensanya masuk akal: 7 bidikan luas pakai 24mm, 4 biasa pakai 35mm,
+3 sosok pakai 85mm, dan 2 detail dekat pakai 100mm makro.
 
 Contoh keluarannya untuk topik sepeda listrik roda tiga:
 

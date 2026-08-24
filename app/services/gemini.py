@@ -500,7 +500,13 @@ ilustrasi atau gambar digital. Sertakan di tiap prompt:
 - subjek dan apa yang sedang terjadi, spesifik
 - jarak dan sudut bidikan (close-up, wide shot, low angle, over the shoulder)
 - cahayanya (golden hour, overcast, harsh midday sun, dim interior)
-- kesan lensa dan kamera (shot on 35mm, shallow depth of field, slight film grain)
+- **kamera dan lensanya - ini WAJIB ada di setiap prompt tanpa kecuali.** Pilih
+  yang cocok dengan jarak bidikannya, bukan asal tempel:
+    * makro atau detail sangat dekat -> `shot on 100mm macro lens`
+    * wajah atau sosok satu orang    -> `shot on 85mm lens, shallow depth of field`
+    * pemandangan luas atau ruangan  -> `shot on 24mm wide lens, deep focus`
+    * bidikan biasa serba guna       -> `shot on 35mm lens`
+  Boleh ditambah `slight film grain` atau `natural bokeh` kalau cocok.
 - diakhiri: photorealistic, vertical 9:16, no text
 Hindari kata yang menjatuhkan hasilnya jadi gambar digital seperti "illustration",
 "3D render", "digital art", "concept art", atau "cinematic lighting" berlebihan.
@@ -508,6 +514,38 @@ Hindari kata yang menjatuhkan hasilnya jadi gambar digital seperti "illustration
 Untuk `cara: "cari"`, `instruksi` diisi kata kunci pencarian singkat dan
 spesifik. Isi `alasan` dengan satu kalimat kenapa cara itu yang dipilih.
 """
+
+
+# Jaring pengaman untuk keterangan lensa. Diminta di prompt, tapi model tidak
+# selalu menurut - pada satu rencana 18 adegan hanya 6 prompt yang menyebutnya.
+# Jadi yang kurang dilengkapi di sini, dan lensanya dipilih menurut jarak
+# bidikan yang tertulis di prompt itu sendiri: menempelkan lensa potret 85mm ke
+# bidikan pemandangan luas justru menghasilkan gambar yang salah.
+_ADA_LENSA = re.compile(
+    r"\b(\d{2,3}\s?mm|macro lens|wide lens|telephoto|shot on|camera|lens)\b", re.I)
+_LENSA_PILIHAN = (
+    (re.compile(r"\b(macro|extreme close-?up|microscopic|tiny detail)\b", re.I),
+     "shot on 100mm macro lens"),
+    (re.compile(r"\b(portrait|close-?up|face|headshot|over the shoulder)\b", re.I),
+     "shot on 85mm lens, shallow depth of field"),
+    (re.compile(r"\b(wide|landscape|aerial|panoram|establishing|vast|skyline)\b", re.I),
+     "shot on 24mm wide lens, deep focus"),
+)
+_LENSA_BAWAAN = "shot on 35mm lens"
+
+
+def _lengkapi_lensa(instruksi: str) -> str:
+    """Sisipkan keterangan lensa kalau prompt-nya belum menyebut kamera."""
+    teks = instruksi.strip()
+    if not teks or _ADA_LENSA.search(teks):
+        return teks
+    lensa = next((l for pola, l in _LENSA_PILIHAN if pola.search(teks)), _LENSA_BAWAAN)
+    # Disisipkan sebelum penutup `photorealistic...` supaya urutan bacanya tetap
+    # wajar: subjek, cahaya, kamera, baru gaya akhirnya.
+    tanda = re.search(r",?\s*photorealistic\b", teks, re.I)
+    if tanda:
+        return f"{teks[:tanda.start()].rstrip(', ')}, {lensa}{teks[tanda.start():]}"
+    return f"{teks.rstrip('. ')}, {lensa}"
 
 
 def _coba_model(client, prompt: str, config, on_status=None, label: str = "naskah"):
@@ -567,4 +605,7 @@ def tulis_naskah_konten(topik: str, kategori: str, kata: int, adegan: int,
     hasil["narasi"] = str(hasil.get("narasi") or "").strip()
     if not hasil["narasi"]:
         raise RuntimeError("Model tidak mengembalikan narasi.")
+    for a in hasil.get("adegan") or []:
+        if a.get("cara") == "buat":
+            a["instruksi"] = _lengkapi_lensa(str(a.get("instruksi") or ""))
     return hasil

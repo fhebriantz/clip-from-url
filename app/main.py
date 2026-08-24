@@ -260,7 +260,7 @@ def content_rencana(req: RencanaRequest) -> dict[str, Any]:
     ).hexdigest()[:32]
     tersimpan = db.cache_ambil(kunci)
     if tersimpan:
-        return {**json.loads(tersimpan), "dari_simpanan": True}
+        return {**_rapikan_rencana(json.loads(tersimpan)), "dari_simpanan": True}
     try:
         hasil = gemini_service.tulis_naskah_konten(
             topik=req.topic, kategori=req.category,
@@ -277,6 +277,18 @@ def content_rencana(req: RencanaRequest) -> dict[str, Any]:
     return {**hasil, "dari_simpanan": False, "id": rid}
 
 
+def _rapikan_rencana(d: dict[str, Any]) -> dict[str, Any]:
+    """Lengkapi keterangan lensa pada rencana yang dibaca dari simpanan.
+
+    Rencana yang dibuat sebelum aturan lensa dipasang tetap ikut terkoreksi saat
+    dibuka lagi, jadi tidak perlu dibuat ulang dan tidak memakai kuota.
+    """
+    for a in d.get("adegan") or []:
+        if a.get("cara") == "buat":
+            a["instruksi"] = gemini_service._lengkapi_lensa(str(a.get("instruksi") or ""))
+    return d
+
+
 @app.get("/api/content/riwayat")
 def content_riwayat() -> list[dict[str, Any]]:
     """Naskah dan daftar gambar yang pernah dibuat, terbaru lebih dulu."""
@@ -288,8 +300,8 @@ def content_riwayat_satu(rid: str) -> dict[str, Any]:
     baris = db.rencana_ambil(rid)
     if not baris:
         raise HTTPException(404, "Rencana tidak ditemukan")
-    return {**json.loads(baris["isi"]), "id": rid, "dari_simpanan": True,
-            "created_at": baris["created_at"]}
+    return {**_rapikan_rencana(json.loads(baris["isi"])), "id": rid,
+            "dari_simpanan": True, "created_at": baris["created_at"]}
 
 
 @app.delete("/api/content/riwayat/{rid}")
