@@ -725,7 +725,8 @@ document.addEventListener("paste", (e) => {
   const gambar = gambarDitempel(e);
   if (!gambar.length) return;
   e.preventDefault();
-  if (OCR) bukaOcr(gambar[0]);   // penanda area sedang terbuka: ganti gambarnya
+  if (OCR) bukaOcr(gambar[0]);              // penanda area sedang terbuka
+  else if (tabAktif() === "konten") unggahAsetKonten(gambar);
   else unggahAset(gambar);
 });
 
@@ -932,4 +933,119 @@ $("usage").addEventListener("click", async (e) => {
   const r = await (await fetch("/api/assets/cleanup", { method: "POST" })).json();
   alert(`${r.dihapus} aset dihapus, ${r.mb} MB dibebaskan, ${r.frame_dirapikan} frame cache dirapikan.`);
   refreshUsage();
+});
+
+/* ------------------------------------------------------------- tab halaman */
+
+// Dua jenis video berbagi satu halaman: yang menjual dan yang tidak. Riwayat dan
+// pemakaian kuota di bawahnya sengaja tidak ikut berganti - keduanya berlaku
+// untuk semua job.
+function gantiTab(nama) {
+  document.querySelectorAll(".tab-btn").forEach((b) => {
+    b.classList.toggle("aktif", b.dataset.tab === nama);
+  });
+  document.querySelectorAll("[data-panel]").forEach((p) => {
+    p.hidden = p.dataset.panel !== nama;
+  });
+  try { localStorage.setItem("tabAktif", nama); } catch { /* diabaikan */ }
+}
+
+function tabAktif() {
+  const b = document.querySelector(".tab-btn.aktif");
+  return b ? b.dataset.tab : "produk";
+}
+
+document.querySelector(".tab").addEventListener("click", (e) => {
+  const nama = e.target.dataset?.tab;
+  if (nama) gantiTab(nama);
+});
+
+try {
+  const simpan = localStorage.getItem("tabAktif");
+  if (simpan) gantiTab(simpan);
+} catch { /* penyimpanan tidak tersedia */ }
+
+/* ---------------------------------------------------------- video konten */
+
+let ASET_KONTEN = [];
+let ARAHAN = {};
+
+async function muatKategori() {
+  try {
+    ARAHAN = await (await fetch("/api/content/kategori")).json();
+  } catch { return; }
+  const sel = $("kKategori");
+  sel.innerHTML = Object.keys(ARAHAN)
+    .map((k) => `<option value="${esc(k)}">${esc(k)}</option>`).join("");
+  sel.value = "anomali";
+  tampilArahan();
+}
+
+function tampilArahan() {
+  $("kArahan").textContent = ARAHAN[$("kKategori").value] || "";
+}
+
+$("kKategori").addEventListener("change", tampilArahan);
+muatKategori();
+
+function renderAsetKonten() {
+  const el = $("kAssetList");
+  el.innerHTML = ASET_KONTEN.length
+    ? ASET_KONTEN.map((a) => `<div class="asset asset-kecil">
+        <div class="asset-head">
+          <img src="/api/assets/${esc(a.id)}/file" alt="">
+          <div class="asset-info">
+            <div class="asset-name">${esc(a.name)}</div>
+            <div class="asset-meta">${a.width}x${a.height}</div>
+          </div>
+          <button type="button" class="link-btn" data-hapuskonten="${esc(a.id)}">Hapus</button>
+        </div>
+      </div>`).join("")
+    : "";
+}
+
+// Gambar konten tidak butuh pengaturan potong: bingkainya diisi utuh dengan
+// latar buram, jadi rasio apa pun sudah aman.
+async function unggahAsetKonten(files) {
+  const gambar = files.filter((f) => f.type.startsWith("image/"));
+  if (!gambar.length) return;
+  const errEl = document.querySelector('[data-err="content"]');
+  errEl.textContent = "Mengunggah...";
+  const fd = new FormData();
+  gambar.forEach((f) => fd.append("files", f));
+  try {
+    const res = await fetch("/api/assets", { method: "POST", body: fd });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || "Upload gagal");
+    ASET_KONTEN = ASET_KONTEN.concat(body.filter((a) => a.kind === "image"));
+    renderAsetKonten();
+    errEl.textContent = "";
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+$("kFiles").addEventListener("change", async (e) => {
+  await unggahAsetKonten([...e.target.files]);
+  e.target.value = "";
+});
+
+$("kAssetList").addEventListener("click", async (e) => {
+  const id = e.target.dataset?.hapuskonten;
+  if (!id) return;
+  await fetch(`/api/assets/${id}`, { method: "DELETE" });
+  ASET_KONTEN = ASET_KONTEN.filter((a) => a.id !== id);
+  renderAsetKonten();
+});
+
+$("formContent").addEventListener("submit", (e) => {
+  e.preventDefault();
+  submit(e.target, "/api/jobs/content", {
+    category: $("kKategori").value,
+    topic: $("kTopik").value.trim(),
+    script: $("kNaskah").value.trim(),
+    title: $("kJudul").value.trim(),
+    gender: $("kGender").value,
+    assets: ASET_KONTEN.map((a) => ({ id: a.id })),
+  }, "content");
 });

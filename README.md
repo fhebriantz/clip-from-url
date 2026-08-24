@@ -523,6 +523,115 @@ trending saat upload.
 
 ---
 
+# 2b. Tab Video konten
+
+Tab kedua membuat video **85 detik tanpa jualan** - untuk diselingi di antara
+unggahan produk supaya feed tidak terbaca sebagai jualan terus-menerus. Durasi
+itu dipilih supaya lewat dari batas satu menit yang disyaratkan Creator Rewards.
+
+## Empat kategori
+
+| Kategori | Isinya |
+|---|---|
+| **misteri** | Peristiwa nyata yang belum terpecahkan, atau dokumen dan program rahasia yang sudah resmi dibuka |
+| **teknologi** | Cara kerja teknologi sehari-hari yang jarang dimengerti |
+| **scifi** | Gagasan fiksi ilmiah dijelaskan dengan fisika dan riset yang sebenarnya |
+| **anomali** | Fakta dunia nyata yang terdengar mustahil tapi terbukti benar |
+
+Topik boleh dikosongkan - Gemini yang memilih. Naskah sendiri juga boleh
+ditempel, dan kalau diisi, Gemini tidak dipanggil sama sekali.
+
+### Kenapa isinya harus benar
+
+Naskahnya diminta bertumpu pada hal yang benar-benar terjadi, dan hal yang belum
+terbukti disebut sebagai belum terbukti. Ini bukan sekadar kehati-hatian:
+Creator Rewards Program menutup monetisasi untuk misinformasi, dan konten yang
+dilaporkan salah bisa menyeret seluruh akun. Jadi konten yang faktual justru
+pilihan yang paling awet.
+
+Tiap video ikut menghasilkan daftar **klaim faktual** di berkas `.txt`-nya,
+lengkap dengan patokan sumbernya - supaya bisa kamu periksa sebelum diunggah.
+
+## Yang dihasilkan
+
+Selain `.mp4`, berkas `.txt`-nya memuat caption, hashtag, daftar klaim untuk
+diperiksa, dan **prompt gambar berbahasa Inggris** yang tinggal ditempel ke
+generator gambar pilihanmu. Prompt itu mengikuti alur ceritanya, tegak 9:16, dan
+tanpa teks di gambar.
+
+## Variasi otomatis tiap video
+
+Unggahan yang bentuknya persis sama terus-menerus terbaca sebagai keluaran satu
+template. Jadi tiap video mengacak sendiri:
+
+- **Transisi** antar gambar, dipilih dari 11 jenis (fade, dissolve, slide, wipe, smooth, circleopen)
+- **Gerakan** tiap gambar, dari 6 pola (zoom masuk/keluar, geser kanan/kiri/atas/bawah)
+- **Durasi** tiap gambar, tidak dibuat sama rata supaya tidak terasa slideshow
+- **Gaya subtitle**: warna sorotan, ukuran, ketebalan garis, dan jarak dari bawah
+- **Font**, dari berkas `.ttf` apa pun yang ada di `assets/fonts/`
+- **Musik latar**, dipilih acak dari `data/bgm/`
+
+Semua yang dipakai dicatat di berkas `.txt` supaya bisa ditelusuri.
+
+## Subtitle karaoke tanpa Whisper
+
+Subtitle menyorot kata yang sedang diucapkan. Itu butuh tahu kapan tiap kata
+mulai dan berakhir, dan cara yang biasa dipakai adalah mentranskripsi ulang
+audionya dengan Whisper - menambah dependensi ratusan MB dan satu tahap lambat.
+
+Tidak dipakai di sini. **Edge TTS bisa mengembalikan penanda waktu per kata**
+lewat `boundary="WordBoundary"`, dan karena kita sendiri yang membuat suaranya,
+penandanya pasti cocok. Subtitle-nya ditulis sebagai berkas ASS dan disorot oleh
+libass, jadi satu baris dialog cukup untuk satu frasa penuh.
+
+Konsekuensinya: tab ini **selalu memakai Edge TTS**, bukan Gemini TTS. Suaranya
+sedikit lebih datar, tapi gratis tanpa batas harian dan penandanya akurat. Satu
+video konten hanya memakai **satu permintaan kuota** - untuk naskahnya saja.
+
+## Musik latar dan auto-ducking
+
+Taruh lagu bebas hak cipta di `data/bgm/`. Musiknya otomatis **menunduk saat
+narasi berbunyi** dan naik lagi di jeda, memakai `sidechaincompress` yang memakai
+narasi sebagai pemicu. Itu lebih rapi daripada menurunkan volume rata sepanjang
+video, karena bagian tanpa narasi tetap terisi.
+
+Kalau folder itu kosong, video tetap jadi - hanya tanpa musik. Jangan pakai lagu
+populer: TikTok akan membisukan atau menurunkan jangkauannya, dan Creator Rewards
+tidak membayar video yang audionya kena klaim.
+
+## Panjang naskah
+
+Sasarannya **217 kata** untuk 85 detik, dihitung dari kecepatan bicara Edge TTS
+yang terukur 2,56 kata per detik. Naskah yang lebih pendek menyisakan musik di
+akhir; yang lebih panjang dipercepat sampai maksimal 1,15x - di atas itu
+suaranya mulai terdengar buru-buru, jadi sisanya akan terpotong dan kamu
+diberi tahu.
+
+## Produksi massal lewat terminal
+
+Kalau naskah dan gambarnya sudah disiapkan sekaligus untuk banyak video:
+
+```
+data/batch/
+  01-sinyal-wow/
+    narasi.txt
+    gambar/01.jpg
+    gambar/02.jpg
+  02-kabel-laut/
+    narasi.txt
+    gambar/
+```
+
+```
+uv run python tools/batch_konten.py data/batch
+uv run python tools/batch_konten.py data/batch --paralel 2
+```
+
+Nama folder jadi nama berkas keluarannya. Folder yang hasilnya sudah ada
+dilewati, jadi menjalankan ulang setelah terhenti tidak mengulang pekerjaan yang
+sudah selesai. Skrip ini memanggil pipeline yang sama dengan tab di UI - tidak
+ada logika yang ditulis dua kali.
+
 # 3. Batas gratis dan biaya
 
 Batas tier gratis berbeda per model:

@@ -347,3 +347,177 @@ def _script_config_teks() -> types.GenerateContentConfig:
     if GEMINI_THINKING and GEMINI_THINKING != "default":
         kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=GEMINI_THINKING)
     return types.GenerateContentConfig(**kwargs)
+
+
+# ------------------------------------------------------- naskah video konten
+
+# Empat sudut yang menahan perhatian penonton laki-laki 18-28 tanpa berjualan.
+# Semuanya bertumpu pada hal yang benar-benar terjadi - lihat _ATURAN_FAKTA di
+# bawah untuk alasannya.
+KATEGORI_KONTEN = {
+    "misteri": (
+        "Peristiwa nyata yang sampai sekarang belum terpecahkan, atau dokumen "
+        "dan program rahasia yang sudah resmi dibuka ke publik. Contoh arah: "
+        "arsip yang baru dideklasifikasi, kapal atau pesawat yang hilang, "
+        "sinyal yang belum dijelaskan, eksperimen pemerintah yang diakui sendiri."
+    ),
+    "teknologi": (
+        "Cara kerja teknologi yang dipakai sehari-hari tapi jarang dimengerti, "
+        "atau teknologi yang sudah ada tapi belum banyak yang tahu. Contoh arah: "
+        "apa yang sebenarnya terjadi saat kamu klik kirim, kenapa baterai menua, "
+        "bagaimana satu kabel di dasar laut menyangga separuh internet."
+    ),
+    "scifi": (
+        "Gagasan fiksi ilmiah yang populer, dijelaskan dengan fisika dan riset "
+        "yang sebenarnya - bagian mana yang mungkin, bagian mana yang mustahil, "
+        "dan sejauh mana ilmu pengetahuan sudah sampai hari ini."
+    ),
+    "anomali": (
+        "Fakta dunia nyata yang terdengar mustahil tapi terbukti benar. Contoh "
+        "arah: tempat yang hukum alamnya berperilaku aneh, makhluk dengan "
+        "kemampuan di luar dugaan, angka atau kebetulan yang sulit dipercaya "
+        "tapi terdokumentasi."
+    ),
+}
+
+# Aturan ini bukan sekadar kehati-hatian. Creator Rewards Program menutup
+# monetisasi untuk misinformasi, dan konten yang dilaporkan salah bisa menyeret
+# seluruh akun. Jadi konten yang bertumpu pada hal yang benar-benar terjadi
+# justru pilihan yang paling aman sekaligus paling awet.
+_ATURAN_FAKTA = """
+ATURAN KEBENARAN - PALING PENTING, JANGAN DILANGGAR:
+- Semua pernyataan faktual harus benar dan bisa ditelusuri ke sumber nyata.
+- Hal yang belum terbukti disebut sebagai belum terbukti. Misteri diceritakan
+  sebagai misteri, JANGAN dijawab dengan dugaan yang diucapkan seperti fakta.
+- DILARANG menuduh orang, perusahaan, atau lembaga yang benar-benar ada
+  melakukan sesuatu yang tidak terbukti.
+- DILARANG memberi klaim kesehatan, obat, investasi, atau ramalan.
+- Kalau kamu tidak yakin sebuah detail benar, buang detailnya. Naskah yang
+  sedikit lebih polos jauh lebih baik daripada satu kalimat yang salah.
+Tegangan cerita datang dari fakta yang memang mengejutkan, bukan dari
+melebih-lebihkan.
+"""
+
+_KONTEN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "judul": {"type": "string", "description": "Judul singkat untuk nama berkas"},
+        "hook": {"type": "string",
+                 "description": "Kalimat pertama, maksimal 12 kata, dibaca dalam 3 detik"},
+        "narasi": {"type": "string",
+                   "description": "Seluruh narasi termasuk hook di kalimat pertama"},
+        "post_caption": {"type": "string", "description": "Caption unggahan, 1-2 kalimat"},
+        "hashtags": {"type": "array", "items": {"type": "string"}},
+        "adegan": {
+            "type": "array",
+            "description": "Bahan gambar per bagian cerita, berurutan",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "prompt_gambar": {
+                        "type": "string",
+                        "description": "Prompt bahasa Inggris untuk generator gambar, "
+                                       "tegak 9:16, sinematik, tanpa teks di gambar",
+                    },
+                    "bagian": {"type": "string", "description": "Bagian cerita yang diwakili"},
+                },
+                "required": ["prompt_gambar", "bagian"],
+            },
+        },
+        "fakta_kunci": {
+            "type": "array",
+            "description": "Klaim faktual utama beserta patokan sumbernya, untuk kamu periksa",
+            "items": {"type": "string"},
+        },
+    },
+    "required": ["judul", "hook", "narasi", "post_caption", "hashtags", "adegan",
+                 "fakta_kunci"],
+}
+
+_KONTEN_PROMPT = """Kamu penulis naskah video pendek berbahasa Indonesia untuk
+TikTok. Penontonnya laki-laki umur 18-28 di Indonesia.
+
+Kategori: {kategori}
+{arahan}
+
+Topik yang diminta: {topik}
+
+{aturan_fakta}
+
+Tulis SATU narasi utuh yang dibacakan tanpa jeda bab, panjangnya {kata} kata
+(boleh meleset 10 kata). Aturan bentuknya:
+- Kalimat PERTAMA adalah hook, maksimal 12 kata, harus bisa dibaca dalam 3 detik,
+  dan harus membuat orang berhenti scroll. Jangan menyapa, jangan basa-basi,
+  jangan bilang "tahukah kamu".
+- Bahasa Indonesia sehari-hari yang santai, seperti bercerita ke teman. Boleh
+  pakai "gue" dan "kamu". Hindari istilah akademis tanpa penjelasan.
+- Bangun rasa penasaran bertingkat: tiap 15-20 detik ada satu fakta baru yang
+  membuat orang bertahan.
+- Kalimat pendek. Rata-rata di bawah 15 kata, karena akan dibaca mesin.
+- Angka ditulis dengan huruf kalau pendek, misalnya "tiga ribu", bukan "3000".
+- Tutup dengan satu pertanyaan yang memancing komentar, bukan ajakan berlangganan.
+- JANGAN menjual apa pun. Ini bukan iklan.
+
+Buat {adegan} entri `adegan` berurutan mengikuti alur ceritanya. Tiap
+`prompt_gambar` ditulis dalam bahasa Inggris, siap ditempel ke generator gambar,
+menggambarkan satu bidikan tegak 9:16 yang sinematik dan tidak memuat teks.
+"""
+
+
+def _coba_model(client, prompt: str, config, on_status=None, label: str = "naskah"):
+    """Jalankan permintaan ke rantai model, dengan pengulangan dan cadangannya.
+
+    Bentuknya sama dengan yang dipakai naskah produk; dipisah supaya alur baru
+    tidak perlu menyalin ulang penanganan 429, 503, dan model yang menolak
+    setelan thinking.
+    """
+    last: Exception | None = None
+    for model in _model_chain():
+        delay = 5.0
+        for attempt in range(1, _ATTEMPTS_PER_MODEL + 1):
+            try:
+                resp = client.models.generate_content(
+                    model=model, contents=prompt, config=config)
+                _record(model, resp)
+                return resp
+            except (genai_errors.ServerError, genai_errors.ClientError) as exc:
+                last = exc
+                code = getattr(exc, "code", None)
+                usage.record(label, model, 0, 0, ok=False, note=str(exc))
+                if code == 429 or code not in _RETRY_CODES or attempt == _ATTEMPTS_PER_MODEL:
+                    break
+                if on_status:
+                    on_status(f"{model} sibuk ({code}), coba lagi {int(delay)}s...")
+                time.sleep(delay)
+                delay = min(delay * 2, 30.0)
+    raise RuntimeError(f"Semua model Gemini menolak permintaan {label}. Terakhir: {last}")
+
+
+def tulis_naskah_konten(topik: str, kategori: str, kata: int, adegan: int,
+                        on_status: Callable[[str], None] | None = None) -> dict:
+    """Minta Gemini menulis naskah video konten beserta bahan gambarnya."""
+    arahan = KATEGORI_KONTEN.get(kategori) or KATEGORI_KONTEN["anomali"]
+    prompt = _KONTEN_PROMPT.format(
+        kategori=kategori,
+        arahan=arahan,
+        topik=topik.strip() or "bebas, pilih yang paling menarik di kategori ini",
+        aturan_fakta=_ATURAN_FAKTA,
+        kata=kata,
+        adegan=adegan,
+    )
+    if on_status:
+        on_status("Menulis naskah konten...")
+    kwargs: dict = {
+        "response_mime_type": "application/json",
+        "response_schema": _KONTEN_SCHEMA,
+        "temperature": 0.95,
+    }
+    if GEMINI_THINKING and GEMINI_THINKING != "default":
+        kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=GEMINI_THINKING)
+    config = types.GenerateContentConfig(**kwargs)
+    resp = _coba_model(_client(), prompt, config, on_status, label="konten")
+    hasil = resp.parsed or {}
+    hasil["narasi"] = str(hasil.get("narasi") or "").strip()
+    if not hasil["narasi"]:
+        raise RuntimeError("Model tidak mengembalikan narasi.")
+    return hasil

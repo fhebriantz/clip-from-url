@@ -8,7 +8,7 @@ import traceback
 
 from . import assets, cache, db
 from .config import ASSET_KEEP_DAYS, ASSET_ORPHAN_HOURS, JOB_WORKERS
-from .pipeline import product_video
+from .pipeline import content_video, product_video
 
 _stop = threading.Event()
 _threads: list[threading.Thread] = []
@@ -96,9 +96,13 @@ def _process(job: dict) -> _PhaseTimer:
     timer = _PhaseTimer()
     report = _report(job_id, timer)
     try:
-        if job["kind"] != "product":
+        if job["kind"] == "product":
+            title = product_video.run(job_id, job["source_url"], job["params"],
+                                      report, _adder(job_id))
+        elif job["kind"] == "content":
+            title = content_video.run(job_id, job["params"], report, _adder(job_id))
+        else:
             raise RuntimeError(f"Jenis job belum didukung: {job['kind']}")
-        title = product_video.run(job_id, job["source_url"], job["params"], report, _adder(job_id))
         db.update_job(job_id, status="done", progress=100, title=title,
                       message="Selesai", error=None)
     except Exception as exc:  # noqa: BLE001 - worker tidak boleh mati karena satu job

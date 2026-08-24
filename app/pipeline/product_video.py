@@ -173,20 +173,43 @@ def _wrap(text: str, width: int = 30) -> str:
     return "\n".join(textwrap.wrap(text, width=width)) or text
 
 
-def _zoom_expr(duration: float, idx: int) -> str:
-    """Ekspresi zoom berbasis nomor frame keluaran.
+# Enam gerakan yang dipakai bergiliran. Sebelumnya cuma dua - zoom masuk dan
+# zoom keluar, keduanya dari titik tengah - jadi setiap video bergerak dengan
+# pola yang persis sama dan cepat terasa monoton. Menggeser bingkai memberi
+# kesan kamera yang berpindah, bukan gambar diam yang membesar.
+GERAK = ("zoom-masuk", "geser-kanan", "zoom-keluar", "geser-bawah",
+         "geser-kiri", "geser-atas")
 
-    Akumulator `zoom` bawaan zoompan tidak bertambah saat d=1 - gambarnya diam
-    total (terukur PSNR ~68 dB antara frame awal dan akhir, alias tidak berubah).
-    Menghitung langsung dari `on` membuat gerakannya benar-benar jalan.
 
-    Arah zoom diselang-seling per scene supaya video dari satu gambar saja tidak
-    terlihat mengulang gerakan yang sama.
+def _gerak_expr(duration: float, idx: int) -> tuple[str, str, str]:
+    """Ekspresi z, x, dan y untuk zoompan, berbeda-beda tiap scene.
+
+    Semuanya dihitung dari nomor frame keluaran `on`. Akumulator `zoom` bawaan
+    zoompan tidak bertambah saat d=1 - gambarnya diam total (terukur PSNR ~68 dB
+    antara frame awal dan akhir, alias tidak berubah sama sekali).
+
+    Mode geser memakai zoom tetap, bukan zoom yang berubah: pada zoom 1 bingkai
+    sudah selebar gambarnya, jadi tidak ada ruang tersisa untuk digeser.
     """
     frames = max(1, int(duration * FPS))
-    if idx % 2 == 0:
-        return f"z='1+{ZOOM_RANGE}*on/{frames}'"
-    return f"z='{1 + ZOOM_RANGE}-{ZOOM_RANGE}*on/{frames}'"
+    maju = f"on/{frames}"
+    dekat = round(1 + ZOOM_RANGE, 4)
+    tengah_x, tengah_y = "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
+
+    mode = GERAK[idx % len(GERAK)]
+    if mode == "zoom-masuk":
+        return f"z='1+{ZOOM_RANGE}*{maju}'", tengah_x, tengah_y
+    if mode == "zoom-keluar":
+        return f"z='{dekat}-{ZOOM_RANGE}*{maju}'", tengah_x, tengah_y
+
+    z = f"z='{dekat}'"
+    if mode == "geser-kanan":
+        return z, f"(iw-iw/zoom)*{maju}", tengah_y
+    if mode == "geser-kiri":
+        return z, f"(iw-iw/zoom)*(1-{maju})", tengah_y
+    if mode == "geser-bawah":
+        return z, tengah_x, f"(ih-ih/zoom)*{maju}"
+    return z, tengah_x, f"(ih-ih/zoom)*(1-{maju})"
 
 
 # Antarmuka TikTok menumpuk di atas video: nama akun dan caption memakan sekitar
@@ -242,9 +265,9 @@ def _render_scene(image: Path, duration: float, caption: str, out: Path, work: P
                   idx: int, layout: str = "blur-tengah", potong: str = "") -> None:
     """Satu scene: latar sesuai tata letak, produk, zoom pelan, subtitle."""
     chain, style = _layout_chain(layout, potong)
+    z, x, y = _gerak_expr(duration, idx)
     chain.append(
-        f"[base]zoompan={_zoom_expr(duration, idx)}:d=1:"
-        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={W}x{H}:fps={FPS}[zm]"
+        f"[base]zoompan={z}:d=1:x='{x}':y='{y}':s={W}x{H}:fps={FPS}[zm]"
     )
 
     last = "[zm]"

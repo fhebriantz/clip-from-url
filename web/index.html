@@ -22,7 +22,12 @@
 <main>
   <div id="pasang" class="pasang" hidden></div>
 
-  <section class="card">
+  <nav class="tab" role="tablist">
+    <button type="button" class="tab-btn aktif" data-tab="produk" role="tab">Video produk</button>
+    <button type="button" class="tab-btn" data-tab="konten" role="tab">Video konten</button>
+  </nav>
+
+  <section class="card" data-panel="produk">
     <form id="formProduct">
 
       <label>URL produk
@@ -110,6 +115,57 @@
           <input id="pNarration" type="checkbox" checked>
           <span>Pakai suara narasi <em>matikan untuk hemat kuota; naskahnya
             tetap ditulis di berkas .txt</em></span>
+        </label>
+      </details>
+    </form>
+  </section>
+
+  <section class="card" data-panel="konten" hidden>
+    <form id="formContent">
+      <p class="petunjuk">Video 85 detik tanpa jualan, untuk diselingi di antara
+        unggahan produk. Naskahnya ditulis Gemini, suaranya Edge TTS yang tidak
+        memakai kuota, dan subtitle-nya menyorot kata per kata.</p>
+
+      <label>Kategori
+        <select id="kKategori"></select>
+      </label>
+      <div id="kArahan" class="petunjuk"></div>
+
+      <label>Topik <span class="opt">kosongkan kalau mau Gemini yang memilih</span>
+        <input id="kTopik" type="text" autocomplete="off"
+               placeholder="Misal: kabel bawah laut yang menyangga internet">
+      </label>
+
+      <label>Gambar <span class="opt">hasil generator gambar, atau foto sendiri</span>
+        <input id="kFiles" type="file" accept="image/*" multiple>
+      </label>
+      <div class="petunjuk">Bisa juga <b>Ctrl+V</b> langsung. Gambar diulang
+        otomatis kalau jumlahnya kurang dari jumlah scene.</div>
+      <div id="kAssetList" class="assets"></div>
+
+      <button type="submit">Buat video konten</button>
+      <div class="error" data-err="content"></div>
+
+      <details class="lanjutan">
+        <summary>Opsi lanjutan</summary>
+
+        <label>Suara narator
+          <select id="kGender">
+            <option value="pria">Pria</option>
+            <option value="wanita">Wanita</option>
+          </select>
+        </label>
+
+        <label>Naskah sendiri <span class="opt">kalau diisi, Gemini tidak dipakai sama sekali</span>
+          <textarea id="kNaskah" rows="6"
+                    placeholder="Tempel naskah narasimu sendiri di sini."></textarea>
+        </label>
+        <div class="petunjuk">Sasarannya sekitar <b>217 kata</b> untuk 85 detik.
+          Lebih pendek berarti ada sisa musik di akhir; lebih panjang akan
+          dipercepat sedikit.</div>
+
+        <label>Judul <span class="opt">untuk nama berkas</span>
+          <input id="kJudul" type="text" autocomplete="off" placeholder="Otomatis dari naskah">
         </label>
       </details>
     </form>

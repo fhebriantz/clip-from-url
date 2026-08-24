@@ -213,6 +213,47 @@ def create_product(req: ProductRequest) -> dict[str, str]:
     return {"job_id": job_id}
 
 
+class ContentRequest(BaseModel):
+    """Video konten 85 detik - bukan iklan, dipakai menyelingi unggahan jualan."""
+    category: Literal["misteri", "teknologi", "scifi", "anomali"] = "anomali"
+    topic: str = Field(default="", max_length=300)
+    # Kosong berarti naskahnya ditulis Gemini dari kategori dan topik di atas.
+    script: str = Field(default="", max_length=8000)
+    title: str = Field(default="", max_length=200)
+    gender: Literal["pria", "wanita"] = "pria"
+    assets: list[AssetRef] = Field(default_factory=list)
+
+
+@app.get("/api/content/kategori")
+def content_kategori() -> dict[str, str]:
+    return dict(gemini_service.KATEGORI_KONTEN)
+
+
+@app.post("/api/jobs/content")
+def create_content(req: ContentRequest) -> dict[str, str]:
+    if not req.script.strip() and not GEMINI_API_KEY:
+        raise HTTPException(400, "GEMINI_API_KEY belum diisi di berkas .env")
+    if not req.assets:
+        raise HTTPException(400, "Unggah dulu gambar untuk dipakai di videonya.")
+    media = assets.load_many([a.model_dump() for a in req.assets])
+    gambar = [str(m.path) for m in media if m.kind == "image"]
+    if not gambar:
+        raise HTTPException(400, "Video konten butuh gambar, bukan hanya klip video.")
+    job_id = db.create_job(
+        "content",
+        "",
+        {
+            "category": req.category,
+            "topic": req.topic,
+            "script": req.script,
+            "title": req.title,
+            "gender": req.gender,
+            "images": gambar,
+        },
+    )
+    return {"job_id": job_id}
+
+
 @app.post("/api/assets")
 async def upload_assets(files: list[UploadFile]) -> list[dict[str, Any]]:
     hasil: list[dict[str, Any]] = []
