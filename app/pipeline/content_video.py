@@ -33,9 +33,17 @@ from .product_video import (
     _slug,
 )
 
-# Creator Rewards menuntut video di atas satu menit, jadi 85 detik memberi jarak
-# aman dari batas itu tanpa membuat penonton kabur di tengah.
-DURASI = 85.0
+# Creator Rewards menuntut video di atas satu menit, jadi kisaran ini memberi
+# jarak aman dari batas itu tanpa membuat penonton kabur di tengah.
+#
+# Durasinya sengaja TIDAK dikunci di satu angka. Dua video pertama yang dibuat
+# alat ini sama-sama berisi 2550 frame persis - satu angka yang berulang di
+# setiap unggahan adalah pola paling gampang dikenali dari sekumpulan video.
+DURASI_MIN, DURASI_MAKS = 82.0, 88.0
+DURASI = 85.0            # dipakai kalau ada yang memanggil tanpa rencana
+
+# Merek kontainer MP4. Keduanya sah dan sama-sama umum dipakai perekam ponsel.
+BRAND = ("mp42", "isom")
 
 # Transisi yang dipilih acak tiap sambungan. Daftarnya sengaja dibatasi ke yang
 # masih enak dilihat pada bingkai tegak - beberapa transisi FFmpeg lain terlihat
@@ -71,6 +79,12 @@ class Rencana:
     durasi_gambar: list[float]
     bgm: Path | None
     tempo: float
+    durasi: float = DURASI
+    rate: str = "+0%"
+    pitch: str = "+0Hz"
+    kata_per_baris: int = 4
+    crf: int = 21
+    brand: str = "mp42"
 
 
 def _gambar_diputar(gambar: list[Path], jumlah: int) -> list[Path]:
@@ -101,12 +115,13 @@ def rencanakan(gambar: list[Path], rnd: random.Random) -> Rencana:
     lalu panjang masing-masing digeser sedikit secara acak dan dinormalkan kembali
     supaya totalnya tetap persis.
     """
-    rerata = (DETIK_PER_GAMBAR_MIN + DETIK_PER_GAMBAR_MAKS) / 2
-    jumlah = max(4, round(DURASI / rerata))
+    durasi = round(rnd.uniform(DURASI_MIN, DURASI_MAKS), 2)
+    rerata = rnd.uniform(DETIK_PER_GAMBAR_MIN + 0.6, DETIK_PER_GAMBAR_MAKS - 0.6)
+    jumlah = max(4, round(durasi / rerata))
 
     # Total tampil harus lebih panjang dari durasi akhir, karena tiap transisi
     # menumpuk dua potongan dan memakan waktu sepanjang transisinya.
-    total_tampil = DURASI + (jumlah - 1) * DURASI_TRANSISI
+    total_tampil = durasi + (jumlah - 1) * DURASI_TRANSISI
     dasar = total_tampil / jumlah
     mentah = [dasar * rnd.uniform(0.82, 1.18) for _ in range(jumlah)]
     skala = total_tampil / sum(mentah)
@@ -121,6 +136,15 @@ def rencanakan(gambar: list[Path], rnd: random.Random) -> Rencana:
         durasi_gambar=durasi_gambar,
         bgm=_pilih_bgm(rnd),
         tempo=1.0,
+        durasi=durasi,
+        # Tempo dan nada bicara ikut digeser sedikit. Hanya ada dua suara Indonesia
+        # di Edge TTS, jadi ini satu-satunya cara membuat jejak audionya berbeda
+        # antar video tanpa terdengar aneh.
+        rate=f"{rnd.choice([-6, -4, -2, 0, 2, 4, 6, 8]):+d}%",
+        pitch=f"{rnd.choice([-3, -2, -1, 0, 1, 2, 3]):+d}Hz",
+        kata_per_baris=rnd.choice([3, 4, 4, 5]),
+        crf=rnd.choice([20, 21, 21, 22, 23]),
+        brand=rnd.choice(BRAND),
     )
 
 
@@ -208,15 +232,35 @@ def _campur_audio(narasi: Path, bgm: Path | None, panjang: float, tempo: float,
                         "-c:a", "aac", "-b:a", "192k", "-ar", "44100", str(out)])
 
 
-def _satukan(video: Path, audio: Path, ass: Path, out: Path) -> None:
-    """Bakar subtitle ke gambar lalu pasang audionya, dalam satu lintasan."""
+def _satukan(video: Path, audio: Path, ass: Path, out: Path,
+             rencana: "Rencana") -> None:
+    """Bakar subtitle ke gambar lalu pasang audionya, dalam satu lintasan.
+
+    Berkas jadi tidak membawa tanda pengenal alat pembuatnya. Secara bawaan
+    FFmpeg menuliskan `encoder=Lavf...` di kontainer dan versi x264 di dalam
+    aliran videonya - keduanya sama persis di setiap keluaran, jadi sekumpulan
+    unggahan langsung terlihat berasal dari satu alat yang sama. `-bitexact`
+    menghilangkan keduanya. Ini menghapus keterangan, bukan memalsukannya:
+    tidak ada tanggal atau perangkat karangan yang ditulis menggantikannya.
+    """
     run_ffmpeg([
         "-i", str(video), "-i", str(audio),
         "-vf", f"subtitles={_esc(ass)}:fontsdir={_esc(ASSETS_DIR / 'fonts')}",
         "-map", "0:v", "-map", "1:a",
-        "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", "21",
+        "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", str(rencana.crf),
         "-pix_fmt", "yuv420p", "-r", str(FPS),
-        "-c:a", "aac", "-b:a", "192k",
+        # Stereo, seperti keluaran kamera ponsel - bukan mono yang jarang dipakai.
+        "-c:a", "aac", "-b:a", "192k", "-ac", "2",
+        # `-bitexact` membuang nomor versi FFmpeg dari metadata, dan penyaring
+        # bitstream membuang NAL bertipe 6 alias SEI - blok yang ditanam x264
+        # berisi seluruh setelan encoder apa adanya, termasuk `threads=12` yang
+        # membocorkan jumlah inti prosesor mesin ini dan sama persis di setiap
+        # video yang keluar dari sini.
+        # (`-x264opts info=0` ditolak build FFmpeg ini; penyaring bitstream
+        # bekerja di semua build karena tidak bergantung pada opsi encoder.)
+        "-map_metadata", "-1", "-bitexact",
+        "-bsf:v", "filter_units=remove_types=6",
+        "-brand", rencana.brand,
         "-movflags", "+faststart", "-shortest", str(out),
     ])
 
@@ -266,10 +310,14 @@ def buat(job_id: str, params: dict, report, add_clip) -> None:
     work.mkdir(parents=True, exist_ok=True)
     rnd = random.Random(params.get("seed") or job_id)
 
+    # Rencana disusun lebih dulu karena tempo dan nada bicaranya ikut diacak,
+    # dan keduanya harus sudah diketahui saat suaranya dibuat.
+    rencana = rencanakan(gambar_masuk, rnd)
+
     report(8, "Membuat narasi dan penanda kata...")
     suara = work / "narasi.mp3"
     kata = karaoke.narasi(naskah, suara, gender=str(params.get("gender") or "pria"),
-                          rate=str(params.get("rate") or "+0%"))
+                          rate=rencana.rate, pitch=rencana.pitch)
     panjang_narasi = karaoke.durasi(suara)
     if not kata:
         raise RuntimeError("Tidak ada penanda kata dari TTS.")
@@ -277,23 +325,23 @@ def buat(job_id: str, params: dict, report, add_clip) -> None:
     # Naskah yang kepanjangan dipercepat sedikit, bukan dipotong - memotong akan
     # menghilangkan kalimat penutup yang biasanya justru ajakan interaksinya.
     tempo = 1.0
-    if panjang_narasi > DURASI:
-        tempo = min(TEMPO_MAKS, panjang_narasi / DURASI)
-        if panjang_narasi / tempo > DURASI + 1.5:
+    if panjang_narasi > rencana.durasi:
+        tempo = min(TEMPO_MAKS, panjang_narasi / rencana.durasi)
+        if panjang_narasi / tempo > rencana.durasi + 1.5:
             report(10, f"Naskah {panjang_narasi:.0f} detik, terlalu panjang untuk "
-                       f"{DURASI:.0f} detik - bagian akhir akan terpotong.")
+                       f"{rencana.durasi:.0f} detik - bagian akhir akan terpotong.")
     if tempo > 1.0:
         # Penanda kata ikut dimampatkan supaya subtitle tetap sejajar suaranya.
         for k in kata:
             k.mulai /= tempo
             k.akhir /= tempo
 
-    rencana = rencanakan(gambar_masuk, rnd)
     rencana.tempo = tempo
     urutan = _gambar_diputar(gambar_masuk, len(rencana.durasi_gambar))
 
-    report(20, f"{len(urutan)} scene, subtitle gaya {rencana.gaya_sub['nama']}, "
-               f"musik {rencana.bgm.name if rencana.bgm else 'tanpa musik'}")
+    report(20, f"{rencana.durasi:.1f} detik, {len(urutan)} scene, subtitle gaya "
+               f"{rencana.gaya_sub['nama']}, musik "
+               f"{rencana.bgm.name if rencana.bgm else 'tanpa musik'}")
 
     potongan = [work / f"scene-{i:02d}.mp4" for i in range(len(urutan))]
     with ThreadPoolExecutor(max_workers=3) as pool:
@@ -309,10 +357,10 @@ def buat(job_id: str, params: dict, report, add_clip) -> None:
 
     report(72, "Mencampur narasi dengan musik latar...")
     audio = work / "audio.m4a"
-    _campur_audio(suara, rencana.bgm, DURASI, tempo, audio)
+    _campur_audio(suara, rencana.bgm, rencana.durasi, tempo, audio)
 
     report(80, "Menulis subtitle karaoke...")
-    baris = karaoke.baris_dari_kata(kata)
+    baris = karaoke.baris_dari_kata(kata, maks=rencana.kata_per_baris)
     ass = karaoke.tulis_ass(baris, work / "sub.ass", rencana.gaya_sub, rencana.font)
 
     report(86, "Membakar subtitle dan merapikan berkas akhir...")
@@ -320,7 +368,7 @@ def buat(job_id: str, params: dict, report, add_clip) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     judul = str(params.get("title") or "video-konten")
     nama = f"{_slug(judul, job_id)}.mp4"
-    _satukan(gabung, audio, ass, out_dir / nama)
+    _satukan(gabung, audio, ass, out_dir / nama, rencana)
 
     total = ffprobe_duration(out_dir / nama)
     catatan = out_dir / f"{Path(nama).stem}.txt"
@@ -346,6 +394,8 @@ def buat(job_id: str, params: dict, report, add_clip) -> None:
         f"{rencana.gaya_sub['ukuran']}px, {rencana.gaya_sub['bawah']}px dari bawah\n"
         f"Transisi : {', '.join(rencana.transisi)}\n"
         f"Musik    : {rencana.bgm.name if rencana.bgm else 'tidak ada'}\n"
+        f"Suara    : tempo {rencana.rate}, nada {rencana.pitch}\n"
+        f"Enkode   : crf {rencana.crf}, brand {rencana.brand}, tanpa tanda pembuat\n"
         f"Tempo    : {tempo:.3f}x  (narasi asli {panjang_narasi:.1f} detik)\n"
         f"Scene    : {len(urutan)} gambar, "
         f"{min(rencana.durasi_gambar):.1f}-{max(rencana.durasi_gambar):.1f} detik\n",

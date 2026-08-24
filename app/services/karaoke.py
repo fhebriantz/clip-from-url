@@ -59,8 +59,9 @@ class Baris:
         return " ".join(k.teks for k in self.kata)
 
 
-async def _ucap(teks: str, voice: str, rate: str, out: Path) -> list[Kata]:
-    komunikasi = edge_tts.Communicate(teks, voice, rate=rate, boundary="WordBoundary")
+async def _ucap(teks: str, voice: str, rate: str, pitch: str, out: Path) -> list[Kata]:
+    komunikasi = edge_tts.Communicate(teks, voice, rate=rate, pitch=pitch,
+                                      boundary="WordBoundary")
     kata: list[Kata] = []
     with out.open("wb") as f:
         async for bagian in komunikasi.stream():
@@ -73,10 +74,11 @@ async def _ucap(teks: str, voice: str, rate: str, out: Path) -> list[Kata]:
     return kata
 
 
-def narasi(teks: str, out: Path, gender: str = "pria", rate: str = "+0%") -> list[Kata]:
+def narasi(teks: str, out: Path, gender: str = "pria", rate: str = "+0%",
+           pitch: str = "+0Hz") -> list[Kata]:
     """Buat berkas suara dari teks, kembalikan penanda waktu tiap katanya."""
     voice = SUARA.get(gender, SUARA["pria"])
-    kata = asyncio.run(_ucap(teks, voice, rate, out))
+    kata = asyncio.run(_ucap(teks, voice, rate, pitch, out))
     if not out.is_file() or out.stat().st_size < 1024:
         raise RuntimeError("Edge TTS tidak menghasilkan suara.")
     return kata

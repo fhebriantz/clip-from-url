@@ -536,6 +536,21 @@ def _render_thumbnail(image: Path, judul: str, harga: str, out: Path, work: Path
     ])
 
 
+# Setiap berkas keluaran FFmpeg membawa tanda pengenal alat pembuatnya: nomor
+# versi di metadata, dan satu blok SEI di dalam aliran video berisi seluruh
+# setelan x264 apa adanya - termasuk `threads=12`, yang membocorkan jumlah inti
+# prosesor mesin ini dan sama persis di setiap video. Sekumpulan unggahan dengan
+# tanda yang identik langsung terlihat berasal dari satu alat.
+#
+# `-bitexact` membuang nomor versinya, dan penyaring bitstream ini membuang NAL
+# bertipe 6 alias SEI. Keduanya MENGHAPUS keterangan, bukan menggantinya dengan
+# yang palsu - tidak ada tanggal atau merek perangkat karangan yang ditulis.
+#
+# Dipasang saat menggabung, bukan di tiap potongan: penggabungan menyalin video
+# tanpa encode ulang, jadi penyaringnya tetap kena sekaligus tanpa biaya.
+_TANPA_JEJAK = ("-bsf:v", "filter_units=remove_types=6")
+
+
 def _gabung(listing: Path, audios: list[Path], pads: list[float], out: Path) -> None:
     """Sambung semua potongan jadi satu video.
 
@@ -570,6 +585,12 @@ def _gabung(listing: Path, audios: list[Path], pads: list[float], out: Path) -> 
     audio_args += [
         # Naikkan ke 44.1 kHz stereo: sebagian platform menolak mono 24 kHz.
         "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-ac", "2", "-shortest",
+        # Buang tanda pengenal alat pembuat. Bawaannya FFmpeg menulis
+        # `encoder=Lavf...` di kontainer dan versi x264 di dalam aliran video -
+        # keduanya sama persis di tiap keluaran, jadi sekumpulan unggahan
+        # langsung terlihat berasal dari satu alat. Ini menghapus keterangan,
+        # bukan menggantinya dengan yang palsu.
+        "-map_metadata", "-1", "-bitexact", *_TANPA_JEJAK,
         "-movflags", "+faststart",
     ]
 
@@ -585,7 +606,7 @@ def _gabung(listing: Path, audios: list[Path], pads: list[float], out: Path) -> 
 
     run_ffmpeg([*base, *audio_args,
                 "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", "20",
-                "-pix_fmt", "yuv420p", str(out)])
+                "-pix_fmt", "yuv420p", *_TANPA_JEJAK, str(out)])
 
 
 def run(job_id: str, url: str, params: dict, report: Report, add_clip) -> str:

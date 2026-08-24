@@ -573,6 +573,68 @@ template. Jadi tiap video mengacak sendiri:
 
 Semua yang dipakai dicatat di berkas `.txt` supaya bisa ditelusuri.
 
+## Supaya tidak terbaca sebagai keluaran satu template
+
+Sekumpulan unggahan yang bentuknya identik terbaca sebagai produksi massal, dan
+itu yang memicu penilaian spam atau konten tidak orisinal. Dua video pertama
+yang dibuat alat ini sama-sama berisi **2550 frame persis** dan membawa tanda
+pengenal yang sama - itu yang diperbaiki.
+
+### Yang diacak tiap video
+
+| Bagian | Kisaran |
+|---|---|
+| Durasi | 82-88 detik, tidak pernah angka yang sama |
+| Jumlah scene | mengikuti durasi dan panjang rata-rata gambar yang juga diacak |
+| Transisi | 11 jenis, diundi per sambungan |
+| Gerakan gambar | 6 pola |
+| Durasi tiap gambar | digeser acak, lalu dinormalkan agar totalnya tetap |
+| Tempo bicara | -6% sampai +8% |
+| Nada bicara | -3Hz sampai +3Hz |
+| Kata per baris subtitle | 3, 4, atau 5 |
+| Gaya subtitle | warna, ukuran, tebal garis, jarak dari bawah |
+| Mutu enkode | crf 20-23 |
+| Merek kontainer | mp42 atau isom |
+
+Tempo dan nada bicara diacak karena Edge TTS **hanya punya dua suara Indonesia**
+- Ardi dan Gadis. Tanpa itu, seluruh unggahanmu memakai jejak audio yang sama.
+
+### Tanda pengenal alat dihapus
+
+Secara bawaan FFmpeg menyisipkan tiga hal yang identik di setiap keluaran:
+
+1. `encoder=Lavf60.16.100` di metadata kontainer
+2. `encoder=Lavc60.31.102 libx264` di metadata aliran video
+3. Satu blok **SEI** di dalam aliran videonya berisi seluruh setelan x264 apa
+   adanya - termasuk `threads=12`, yang membocorkan jumlah inti prosesor mesinmu
+
+Yang ketiga paling menonjol: nilainya sama persis di setiap video dari komputer
+yang sama. `-bitexact` membuang nomor versinya, dan penyaring bitstream
+`filter_units=remove_types=6` membuang blok SEI-nya.
+
+Ini **menghapus keterangan, bukan memalsukannya** - tidak ada tanggal atau merek
+perangkat karangan yang ditulis menggantikannya. Berkas tanpa keterangan pembuat
+adalah hal yang lumrah; berkas dengan keterangan palsu tidak.
+
+Diverifikasi pada video jadi: SEI 0, `threads=` 0, tag kontainer kosong, dan
+seluruh frame tetap terbaca normal.
+
+### Yang TIDAK bisa diperbaiki oleh alat ini
+
+Urutan yang benar-benar menentukan, dari yang paling berpengaruh:
+
+1. **Keorisinalan isinya.** Kebijakan *unoriginal content* TikTok menyasar
+   konten yang diunggah ulang atau diproduksi massal dari bahan yang sama. Kalau
+   kamu memakai gambar yang sama untuk sepuluh video, tidak ada variasi teknis
+   yang menolongmu. Siapkan gambar baru tiap video.
+2. **Irama mengunggah.** Dua puluh video dalam satu jam terbaca sebagai bot
+   berapa pun variasinya. Sebar sepanjang hari.
+3. **Variasi audio-visual.** Bagian ini yang diurus alat ini.
+4. **Metadata.** Sinyal paling lemah, tapi paling murah dibersihkan - dan sudah.
+
+Tidak ada jaminan bebas dari pembatasan jangkauan. Yang bisa dijanjikan alat ini
+hanya satu: videomu tidak akan tertangkap karena bentuknya seragam.
+
 ## Subtitle karaoke tanpa Whisper
 
 Subtitle menyorot kata yang sedang diucapkan. Itu butuh tahu kapan tiap kata
