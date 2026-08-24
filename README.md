@@ -702,9 +702,15 @@ ditawarkan, bukan salah satunya dipaksakan:
 | Sorotan subtitle | **tepat per kata** | ditaksir, meleset ~0,1 detik |
 | Intonasi | lebih datar | jauh lebih hidup |
 
-Untuk suara Gemini, narasinya dipecah per kalimat dan tiap kalimat diukur
-durasinya - itu memberi **jangkar yang pasti** di tiap awal dan akhir kalimat.
-Di dalam kalimat, waktu tiap kata ditaksir dari panjang hurufnya.
+Untuk suara Gemini, audionya dibuat **sekali untuk seluruh naskah dan tidak
+dipotong sama sekali**. Jangkar waktunya didapat dengan membaca letak jeda
+alaminya lewat `silencedetect`, lalu waktu tiap kata di dalam kalimat ditaksir
+dari panjang hurufnya.
+
+> Versi pertama memotong audionya per kalimat lewat `_split_audio`, dan itu
+> membuang hening di tiap ujung potongan - terukur **13% durasi hilang**, lalu
+> kalimatnya menempel satu sama lain dan terdengar terburu-buru. Sekarang
+> audionya utuh: 48,0 detik dari 48,4 detik mentah.
 
 Ketepatannya diukur, bukan dikira-kira: dibandingkan dengan penanda asli Edge
 TTS pada lima kalimat, taksirannya meleset **rata-rata 88 milidetik** dan paling
@@ -726,13 +732,24 @@ Kalau folder itu kosong, video tetap jadi - hanya tanpa musik. Jangan pakai lagu
 populer: TikTok akan membisukan atau menurunkan jangkauannya, dan Creator Rewards
 tidak membayar video yang audionya kena klaim.
 
-## Panjang naskah
+## Panjang naskah, dan apa yang terjadi kalau meleset
 
-Sasarannya **217 kata** untuk 85 detik, dihitung dari kecepatan bicara Edge TTS
-yang terukur 2,56 kata per detik. Naskah yang lebih pendek menyisakan musik di
-akhir; yang lebih panjang dipercepat sampai maksimal 1,15x - di atas itu
-suaranya mulai terdengar buru-buru, jadi sisanya akan terpotong dan kamu
-diberi tahu.
+Sasarannya **217 kata**, dari kecepatan bicara yang terukur hampir sama di kedua
+mesin: Edge 2,56 dan Gemini Puck 2,62 kata per detik.
+
+Model cenderung menulis lebih pendek dari yang diminta - saat diminta 217 kata
+ia menulis 157. Karena itu prompt-nya menyebut **batas minimal**, bukan sasaran
+longgar, dan menyuruhnya menghitung sendiri sebelum menjawab. Setelah diperbaiki
+naskahnya jadi 209 kata.
+
+Kalau narasinya tetap lebih pendek, **videonya yang mengalah**: durasinya
+dipendekkan mengikuti narasi plus paling banyak 6 detik ekor musik, dengan
+lantai 62 detik supaya tetap lewat dari syarat satu menit Creator Rewards. Kamu
+diberi tahu di daftar progres, misalnya *"Narasi cuma 52 detik, video
+dipendekkan dari 87 jadi 62 detik."*
+
+Naskah yang kepanjangan dipercepat sampai maksimal 1,15x - di atas itu suaranya
+mulai terdengar buru-buru, jadi sisanya akan terpotong dan kamu diberi tahu.
 
 ## Produksi massal lewat terminal
 

@@ -62,6 +62,14 @@ DETIK_PER_GAMBAR_MAKS = 6.0
 # terdengar buru-buru dan tidak enak didengar.
 TEMPO_MAKS = 1.15
 
+# Creator Rewards menuntut lebih dari satu menit, jadi video tidak pernah
+# dipendekkan sampai di bawah angka ini walau narasinya jauh lebih singkat.
+DURASI_LANTAI = 62.0
+
+# Musik boleh berjalan sendirian selama ini di akhir, sebagai penutup. Lebih dari
+# itu terasa seperti video yang kehabisan bahan.
+EKOR_MAKS = 6.0
+
 BGM_DIR = DATA_DIR / "bgm"
 BGM_EKSTENSI = (".mp3", ".m4a", ".wav", ".ogg", ".opus")
 
@@ -108,6 +116,22 @@ def _pilih_bgm(rnd: random.Random) -> Path | None:
     return rnd.choice(lagu) if lagu else None
 
 
+def _bagi_durasi(durasi: float, jumlah: int, rnd: random.Random) -> list[float]:
+    """Bagi durasi video ke tiap gambar, panjangnya tidak dibuat sama rata.
+
+    Total tampil harus lebih panjang dari durasi akhir, karena tiap transisi
+    menumpuk dua potongan dan memakan waktu sepanjang transisinya.
+    """
+    total_tampil = durasi + (jumlah - 1) * DURASI_TRANSISI
+    dasar = total_tampil / jumlah
+    mentah = [dasar * rnd.uniform(0.82, 1.18) for _ in range(jumlah)]
+    skala = total_tampil / sum(mentah)
+    hasil = [round(d * skala, 3) for d in mentah]
+    # Selisih pembulatan dibebankan ke potongan terakhir supaya totalnya tepat.
+    hasil[-1] = round(total_tampil - sum(hasil[:-1]), 3)
+    return hasil
+
+
 def rencanakan(gambar: list[Path], rnd: random.Random) -> Rencana:
     """Tentukan berapa scene, berapa lama tiap scene, dan variasi tampilannya.
 
@@ -119,16 +143,7 @@ def rencanakan(gambar: list[Path], rnd: random.Random) -> Rencana:
     durasi = round(rnd.uniform(DURASI_MIN, DURASI_MAKS), 2)
     rerata = rnd.uniform(DETIK_PER_GAMBAR_MIN + 0.6, DETIK_PER_GAMBAR_MAKS - 0.6)
     jumlah = max(4, round(durasi / rerata))
-
-    # Total tampil harus lebih panjang dari durasi akhir, karena tiap transisi
-    # menumpuk dua potongan dan memakan waktu sepanjang transisinya.
-    total_tampil = durasi + (jumlah - 1) * DURASI_TRANSISI
-    dasar = total_tampil / jumlah
-    mentah = [dasar * rnd.uniform(0.82, 1.18) for _ in range(jumlah)]
-    skala = total_tampil / sum(mentah)
-    durasi_gambar = [round(d * skala, 3) for d in mentah]
-    # Bulatkan selisih sisa ke potongan terakhir supaya jumlahnya tepat.
-    durasi_gambar[-1] = round(total_tampil - sum(durasi_gambar[:-1]), 3)
+    durasi_gambar = _bagi_durasi(durasi, jumlah, rnd)
 
     return Rencana(
         gaya_sub=rnd.choice(karaoke.GAYA_SUB),
@@ -297,38 +312,91 @@ def run(job_id: str, params: dict, report, add_clip) -> str:
 
 def _narasi_gemini(naskah: str, work: Path, gender: str, voice: str,
                    report) -> tuple[Path, list, str]:
-    """Narasi dengan suara Gemini, penanda katanya ditaksir per kalimat.
+    """Narasi dengan suara Gemini, penanda katanya ditaksir dari jeda aslinya.
 
-    Satu permintaan kuota untuk seluruh narasi: `synth_many` mengirim semuanya
-    sekaligus lalu memotongnya di batas bicara. Tiap potongan diukur durasinya,
-    dan itu jadi jangkar pasti untuk awal-akhir tiap kalimat.
+    Audionya dibuat SEKALI untuk seluruh naskah dan tidak dipotong sama sekali.
+    Versi sebelumnya memotongnya per kalimat lewat `_split_audio`, dan itu
+    membuang hening di tiap ujung potongan - terukur 13% dari durasinya hilang,
+    lalu kalimatnya menempel satu sama lain dan terdengar terburu-buru.
+
+    Jangkar waktunya tetap didapat, tapi dengan membaca letak jeda alaminya
+    lewat silencedetect, bukan dengan menggunting. Kalau jedanya kurang dari
+    jumlah kalimat, pembagiannya jatuh ke perbandingan panjang huruf - lebih
+    kasar, tapi audionya tetap utuh.
     """
     kalimat = karaoke.pecah_kalimat(naskah)
     if not kalimat:
         raise RuntimeError("Naskah tidak bisa dipecah jadi kalimat.")
-    stems = [work / f"kal-{i:02d}" for i in range(len(kalimat))]
-    meta: dict = {}
-    berkas = tts_service.synth_many(
-        list(zip(kalimat, stems)), gender=gender, voice_name=voice,
-        on_status=lambda m: report(10, m), meta=meta)
 
-    # Potongan disambung jadi satu, dan posisi sambungannya jadi jangkar waktu.
-    daftar = work / "narasi-list.txt"
-    daftar.write_text("".join(f"file '{b.as_posix()}'\n" for b in berkas),
-                      encoding="utf-8")
-    suara = work / "narasi.m4a"
-    run_ffmpeg(["-f", "concat", "-safe", "0", "-i", str(daftar),
-                "-c:a", "aac", "-b:a", "192k", "-ar", "44100", str(suara)])
+    klien = gemini_service.make_client()
+    stem = work / "narasi"
+    galat: Exception | None = None
+    dipakai = ""
+    for model in tts_service.tts_model_chain():
+        report(10, f"Narasi dengan {model} (suara {voice or 'bawaan'})...")
+        try:
+            suara = tts_service._gemini_one(
+                klien, naskah, voice or tts_service.voice_pool(gender)[0],
+                tts_service.DEFAULT_STYLE, stem, multi=True, model=model)
+            dipakai = model
+            break
+        except Exception as exc:  # noqa: BLE001 - coba model berikutnya
+            galat = exc
+    else:
+        raise RuntimeError(f"Semua model TTS Gemini gagal. Terakhir: {galat}")
+
+    total = karaoke.durasi(suara)
+    batas = _batas_kalimat(suara, total, len(kalimat),
+                           [len(k) for k in kalimat])
 
     kata: list = []
-    jalan = 0.0
-    for teks, b in zip(kalimat, berkas):
-        panjang = karaoke.durasi(b)
-        kata.extend(karaoke.taksir_kata(teks, jalan, jalan + panjang))
-        jalan += panjang
-    catatan = (f"{meta.get('provider', 'gemini')} suara {meta.get('voice', voice or '?')}"
-               f" - penanda kata ditaksir per kalimat (meleset ~0,1 detik)")
+    for teks, (a, b) in zip(kalimat, batas):
+        kata.extend(karaoke.taksir_kata(teks, a, b))
+    catatan = (f"{dipakai} suara {voice or tts_service.voice_pool(gender)[0]}"
+               f" - penanda kata ditaksir dari jeda alaminya, audio tidak dipotong")
     return suara, kata, catatan
+
+
+def _batas_kalimat(suara: Path, total: float, jumlah: int,
+                   panjang: list[int] | None = None) -> list[tuple[float, float]]:
+    """Rentang waktu tiap kalimat, dibaca dari jeda bicara di dalam audionya."""
+    if jumlah <= 1:
+        return [(0.0, total)]
+    try:
+        hening = tts_service._silences(suara)
+    except Exception:  # noqa: BLE001 - deteksi hening gagal, pakai perbandingan saja
+        hening = []
+    dalam = [h for h in hening if h[0] > 0.2 and h[1] < total - 0.2]
+
+    if len(dalam) >= jumlah - 1:
+        # Jeda terpanjang paling mungkin batas kalimat; sisanya jeda di tengah
+        # kalimat yang tidak boleh dipakai memotong.
+        dalam.sort(key=lambda h: h[1] - h[0], reverse=True)
+        pilih = sorted(dalam[: jumlah - 1])
+        batas = []
+        awal = 0.0
+        for a, b in pilih:
+            batas.append((awal, a))
+            awal = b
+        batas.append((awal, total))
+        return batas
+
+    # Jeda tidak cukup untuk menandai setiap batas. Dibagi menurut panjang
+    # tulisannya - lebih kasar, tapi audionya tetap utuh dan tidak terpotong.
+    return _batas_proporsi(total, jumlah, panjang)
+
+
+def _batas_proporsi(total: float, jumlah: int,
+                    panjang: list[int] | None = None) -> list[tuple[float, float]]:
+    bobot = panjang or [1] * jumlah
+    jml = sum(bobot)
+    batas = []
+    jalan = 0.0
+    for b in bobot:
+        lebar = total * b / jml
+        batas.append((jalan, jalan + lebar))
+        jalan += lebar
+    return batas
 
 
 def buat(job_id: str, params: dict, report, add_clip) -> None:
@@ -380,6 +448,20 @@ def buat(job_id: str, params: dict, report, add_clip) -> None:
         for k in kata:
             k.mulai /= tempo
             k.akhir /= tempo
+
+    # Narasi yang jauh lebih pendek dari rencana akan menyisakan video berjalan
+    # tanpa suara - persis yang terjadi kalau model menulis naskah kependekan.
+    # Videonya yang mengalah, bukan penontonnya.
+    panjang_pakai = panjang_narasi / max(tempo, 1.0)
+    if panjang_pakai + EKOR_MAKS < rencana.durasi:
+        semula = rencana.durasi
+        rencana.durasi = round(max(DURASI_LANTAI, panjang_pakai + EKOR_MAKS), 2)
+        if rencana.durasi < semula - 0.5:
+            report(12, f"Narasi cuma {panjang_pakai:.0f} detik, video dipendekkan "
+                       f"dari {semula:.0f} jadi {rencana.durasi:.0f} detik.")
+        # Durasi berubah, jadi jatah tiap gambar dihitung ulang.
+        rencana.durasi_gambar = _bagi_durasi(rencana.durasi, len(rencana.durasi_gambar), rnd)
+        rencana.transisi = rencana.transisi[:len(rencana.durasi_gambar) - 1]
 
     rencana.tempo = tempo
     urutan = _gambar_diputar(gambar_masuk, len(rencana.durasi_gambar))

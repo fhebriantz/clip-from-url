@@ -457,8 +457,15 @@ Topik yang diminta: {topik}
 
 {aturan_fakta}
 
-Tulis SATU narasi utuh yang dibacakan tanpa jeda bab, panjangnya {kata} kata
-(boleh meleset 10 kata). Aturan bentuknya:
+Tulis SATU narasi utuh yang dibacakan tanpa jeda bab.
+
+PANJANG: minimal {kata_min} kata, idealnya {kata} kata. Ini syarat, bukan
+sasaran longgar. Naskah yang lebih pendek dari {kata_min} kata TIDAK TERPAKAI,
+karena akan menyisakan video kosong tanpa suara. Hitung sendiri kata-katamu
+sebelum menjawab, dan kalau kurang, tambahkan satu fakta lagi - jangan
+memanjangkannya dengan basa-basi atau pengulangan.
+
+Aturan bentuknya:
 - Kalimat PERTAMA adalah hook, maksimal 12 kata, harus bisa dibaca dalam 3 detik,
   dan harus membuat orang berhenti scroll. Jangan menyapa, jangan basa-basi,
   jangan bilang "tahukah kamu".
@@ -527,6 +534,7 @@ def tulis_naskah_konten(topik: str, kategori: str, kata: int, adegan: int,
         topik=topik.strip() or "bebas, pilih yang paling menarik di kategori ini",
         aturan_fakta=_ATURAN_FAKTA,
         kata=kata,
+        kata_min=int(kata * 0.88),
         adegan=adegan,
     )
     if on_status:
