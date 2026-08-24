@@ -414,14 +414,27 @@ _KONTEN_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "prompt_gambar": {
+                    "bagian": {"type": "string",
+                               "description": "Bagian cerita yang diwakili, singkat"},
+                    "cara": {
                         "type": "string",
-                        "description": "Prompt bahasa Inggris untuk generator gambar, "
-                                       "tegak 9:16, sinematik, tanpa teks di gambar",
+                        "enum": ["cari", "buat"],
+                        "description": "cari = foto nyata yang harus dicari di internet; "
+                                       "buat = gambar yang digenerate AI",
                     },
-                    "bagian": {"type": "string", "description": "Bagian cerita yang diwakili"},
+                    "instruksi": {
+                        "type": "string",
+                        "description": "Kalau cara=cari: kata kunci pencarian dalam bahasa "
+                                       "Indonesia atau Inggris, singkat dan spesifik. "
+                                       "Kalau cara=buat: prompt lengkap bahasa Inggris untuk "
+                                       "generator gambar, tegak 9:16, sinematik, tanpa teks.",
+                    },
+                    "alasan": {
+                        "type": "string",
+                        "description": "Satu kalimat singkat kenapa cara itu yang dipilih",
+                    },
                 },
-                "required": ["prompt_gambar", "bagian"],
+                "required": ["bagian", "cara", "instruksi", "alasan"],
             },
         },
         "fakta_kunci": {
@@ -458,9 +471,20 @@ Tulis SATU narasi utuh yang dibacakan tanpa jeda bab, panjangnya {kata} kata
 - Tutup dengan satu pertanyaan yang memancing komentar, bukan ajakan berlangganan.
 - JANGAN menjual apa pun. Ini bukan iklan.
 
-Buat {adegan} entri `adegan` berurutan mengikuti alur ceritanya. Tiap
-`prompt_gambar` ditulis dalam bahasa Inggris, siap ditempel ke generator gambar,
-menggambarkan satu bidikan tegak 9:16 yang sinematik dan tidak memuat teks.
+Buat {adegan} entri `adegan` berurutan mengikuti alur ceritanya. Untuk tiap
+adegan, tentukan sendiri gambarnya sebaiknya DICARI atau DIBUAT:
+
+- Pakai `cara: "cari"` untuk apa pun yang NYATA dan bisa diperiksa orang: tokoh
+  sungguhan, tempat sungguhan, benda atau produk sungguhan, dokumen, arsip, dan
+  foto peristiwa yang benar-benar terjadi. Gambar buatan untuk hal semacam ini
+  berisiko menyesatkan, karena penonton akan mengiranya foto asli.
+  `instruksi` diisi kata kunci pencarian yang singkat dan spesifik.
+- Pakai `cara: "buat"` untuk yang tidak bisa difoto atau memang hanya ilustrasi:
+  suasana, konsep, penggambaran, adegan pengantar, atau visual abstrak.
+  `instruksi` diisi prompt lengkap bahasa Inggris, siap ditempel ke generator
+  gambar, menggambarkan satu bidikan tegak 9:16 yang sinematik dan tanpa teks.
+
+Isi `alasan` dengan satu kalimat singkat kenapa cara itu yang dipilih.
 """
 
 

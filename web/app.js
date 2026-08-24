@@ -1049,6 +1049,7 @@ async function unggahAsetKonten(files) {
     if (!res.ok) throw new Error(body.detail || "Upload gagal");
     ASET_KONTEN = ASET_KONTEN.concat(body.filter((a) => a.kind === "image"));
     renderAsetKonten();
+    perbaruiTombolKonten();
     errEl.textContent = "";
   } catch (err) {
     errEl.textContent = err.message;
@@ -1066,6 +1067,7 @@ $("kAssetList").addEventListener("click", async (e) => {
   await fetch(`/api/assets/${id}`, { method: "DELETE" });
   ASET_KONTEN = ASET_KONTEN.filter((a) => a.id !== id);
   renderAsetKonten();
+  perbaruiTombolKonten();
 });
 
 function suaraTerpilih() {
@@ -1073,14 +1075,145 @@ function suaraTerpilih() {
   return { engine: mesin, gender, voice: nama || "" };
 }
 
-$("formContent").addEventListener("submit", (e) => {
+// Alurnya dua tahap dan tombolnya mengikuti: selama belum ada gambar, yang bisa
+// dikerjakan cuma menyusun cerita dan daftar gambarnya. Videonya baru bisa
+// dirender setelah gambarnya terkumpul.
+function perbaruiTombolKonten() {
+  $("kSubmit").textContent = ASET_KONTEN.length
+    ? "Buat video konten"
+    : "Buat naskah + daftar gambar";
+}
+
+function kartuAdegan(a, i) {
+  const cari = a.cara === "cari";
+  return `<li class="adegan">
+    <div class="adegan-kepala">
+      <span class="adegan-no">Gambar ${i + 1}</span>
+      <span class="adegan-cara ${cari ? "cari" : "buat"}">${cari ? "cari di internet" : "buat pakai AI"}</span>
+      <span class="adegan-bagian">${esc(a.bagian || "")}</span>
+    </div>
+    <div class="adegan-instruksi" data-salin="${esc(a.instruksi || "")}">${esc(a.instruksi || "")}</div>
+    <div class="adegan-kaki">
+      <span>${esc(a.alasan || "")}</span>
+      <button type="button" class="link-btn" data-salinbtn="${i}">Salin</button>
+    </div>
+  </li>`;
+}
+
+function tampilRencana(d) {
+  const tagar = (d.hashtags || []).map((t) => "#" + String(t).replace(/^#/, "")).join(" ");
+  $("kRencana").hidden = false;
+  $("kRencana").innerHTML = `
+    <h3>${esc(d.judul || "Rencana konten")}</h3>
+    ${d.dari_simpanan ? '<p class="petunjuk">Diambil dari simpanan, tanpa memakai kuota.</p>' : ""}
+    <p class="rencana-hook">${esc(d.hook || "")}</p>
+    <p class="petunjuk">Naskahnya sudah diisikan ke <b>Naskah sendiri</b> di Opsi
+      lanjutan. Jangan diubah kalau mau videonya dibuat tanpa memakai kuota lagi.</p>
+    <ol class="adegan-list">${(d.adegan || []).map(kartuAdegan).join("")}</ol>
+    <div class="petunjuk">Gambar yang <b>dicari di internet</b> belum tentu bebas
+      dipakai. Saring hasil pencarian ke lisensi yang mengizinkan penggunaan
+      ulang, atau ambil dari sumber gratis seperti Wikimedia Commons, Pexels,
+      dan Unsplash.</div>
+    <div class="rencana-caption">
+      <b>Caption:</b> ${esc(d.post_caption || "")}<br>${esc(tagar)}
+    </div>
+    ${(d.fakta_kunci || []).length ? `<div class="rencana-fakta">
+      <b>Periksa dulu klaim ini:</b>
+      <ul>${d.fakta_kunci.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+    </div>` : ""}
+    <p class="petunjuk">Setelah gambarnya terkumpul, unggah di atas sesuai
+      urutan, lalu tombolnya berubah jadi <b>Buat video konten</b>.</p>`;
+}
+
+// navigator.clipboard hanya ada di HTTPS atau localhost, sedangkan UI ini
+// justru paling sering dibuka dari HP lewat http://192.168.x.x - di sana ia
+// tidak ada sama sekali. Cara lama lewat textarea sementara tetap bekerja di
+// konteks tidak aman, jadi dipakai sebagai cadangan.
+async function salinTeks(teks) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(teks);
+      return true;
+    }
+  } catch { /* jatuh ke cara lama */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = teks;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);   // iOS butuh ini
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch { return false; }
+}
+
+// Menyentuh kotak instruksi menyorot seluruh isinya. Ini jaring pengaman yang
+// tidak bergantung pada izin apa pun: kalaupun penyalinan otomatis ditolak
+// browser, teksnya sudah tersorot dan tinggal ditekan lama lalu disalin.
+$("kRencana").addEventListener("click", (e) => {
+  const kotak = e.target.closest(".adegan-instruksi");
+  if (!kotak) return;
+  const jangkauan = document.createRange();
+  jangkauan.selectNodeContents(kotak);
+  const pilihan = getSelection();
+  pilihan.removeAllRanges();
+  pilihan.addRange(jangkauan);
+});
+
+$("kRencana").addEventListener("click", async (e) => {
+  const i = e.target.dataset?.salinbtn;
+  if (i === undefined) return;
+  const teks = $("kRencana").querySelectorAll("[data-salin]")[Number(i)]?.dataset.salin;
+  if (!teks) return;
+  const ok = await salinTeks(teks);
+  e.target.textContent = ok ? "Tersalin" : "Tekan lama untuk menyalin";
+  setTimeout(() => { e.target.textContent = "Salin"; }, 1800);
+});
+
+
+
+$("formContent").addEventListener("submit", async (e) => {
   e.preventDefault();
-  submit(e.target, "/api/jobs/content", {
-    category: $("kKategori").value,
-    topic: $("kTopik").value.trim(),
-    script: $("kNaskah").value.trim(),
-    title: $("kJudul").value.trim(),
-    ...suaraTerpilih(),
-    assets: ASET_KONTEN.map((a) => ({ id: a.id })),
-  }, "content");
+  if (ASET_KONTEN.length) {
+    submit(e.target, "/api/jobs/content", {
+      category: $("kKategori").value,
+      topic: $("kTopik").value.trim(),
+      script: $("kNaskah").value.trim(),
+      title: $("kJudul").value.trim(),
+      ...suaraTerpilih(),
+      assets: ASET_KONTEN.map((a) => ({ id: a.id })),
+    }, "content");
+    return;
+  }
+
+  const errEl = document.querySelector('[data-err="content"]');
+  const btn = $("kSubmit");
+  errEl.textContent = "";
+  btn.disabled = true;
+  btn.textContent = "Menyusun cerita dan daftar gambarnya...";
+  try {
+    const res = await fetch("/api/content/rencana", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        category: $("kKategori").value,
+        topic: $("kTopik").value.trim(),
+        adegan: 6,
+      }),
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.detail || "Gagal menyusun rencana");
+    // Naskah dan judulnya diisikan supaya tahap kedua memakai yang sama persis
+    // dan tidak perlu memanggil Gemini lagi.
+    $("kNaskah").value = d.narasi || "";
+    $("kJudul").value = d.judul || "";
+    tampilRencana(d);
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    perbaruiTombolKonten();
+  }
 });

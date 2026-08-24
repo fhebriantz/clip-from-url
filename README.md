@@ -552,6 +552,50 @@ pilihan yang paling awet.
 Tiap video ikut menghasilkan daftar **klaim faktual** di berkas `.txt`-nya,
 lengkap dengan patokan sumbernya - supaya bisa kamu periksa sebelum diunggah.
 
+## Kalau belum punya gambar sama sekali
+
+Kosongkan bagian gambar, dan tombolnya berubah jadi **Buat naskah + daftar
+gambar**. Yang keluar bukan video, tapi rencananya: naskah lengkap plus daftar
+bernomor berisi gambar apa saja yang harus kamu siapkan.
+
+Tiap gambar diberi **cara** yang berbeda, dan Gemini sendiri yang memutuskan
+mana yang mana:
+
+| Cara | Dipakai untuk | Isi instruksinya |
+|---|---|---|
+| **cari di internet** | Tokoh, tempat, benda, dokumen, dan peristiwa yang benar-benar ada | Kata kunci pencarian |
+| **buat pakai AI** | Suasana, konsep, ilustrasi, visual yang tidak bisa difoto | Prompt lengkap bahasa Inggris |
+
+Pemisahan ini bukan sekadar kerapian. Gambar buatan AI untuk hal yang nyata
+berisiko menyesatkan - penonton akan mengiranya foto asli. Jadi yang nyata
+dicari, yang ilustratif dibuat.
+
+Contoh keluarannya untuk topik sepeda listrik roda tiga:
+
+```
+Gambar 1  [cari di internet]  Hook sepeda roda tiga keluarga
+          Chinese electric tricycle carrying family
+
+Gambar 3  [buat pakai AI]     Kekuatan menanjak dan muatan penuh
+          A cinematic vertical 9:16 shot of a modern electric tricycle
+          carrying a family uphill on a sunny suburban street, ...
+```
+
+Tiap instruksi punya tombol **Salin**, dan menyentuh kotaknya menyorot seluruh
+teks - jadi tetap bisa disalin manual kalau browser menolak menyalin otomatis.
+
+**Naskahnya langsung diisikan** ke kolom *Naskah sendiri* di Opsi lanjutan.
+Selama tidak kamu ubah, tahap kedua memakai naskah yang sama dan **tidak
+memanggil Gemini lagi**. Rencana yang sama - kategori, topik, dan jumlah adegan
+yang sama - juga diambil dari simpanan tanpa memakai kuota.
+
+Setelah gambarnya terkumpul, unggah sesuai urutan dan tombolnya berubah sendiri
+jadi **Buat video konten**.
+
+> Gambar hasil pencarian belum tentu bebas dipakai. Saring ke lisensi yang
+> mengizinkan penggunaan ulang, atau ambil dari Wikimedia Commons, Pexels, dan
+> Unsplash.
+
 ## Yang dihasilkan
 
 Selain `.mp4`, berkas `.txt`-nya memuat caption, hashtag, daftar klaim untuk

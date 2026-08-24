@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from . import assets, db, models_info, usage, worker
+from .pipeline import content_video
 from .services import gemini as gemini_service
 from .services import tts
 from .sources.product import UnsupportedURL, detect_source
@@ -234,6 +235,41 @@ def content_kategori() -> dict[str, Any]:
         "kategori": dict(gemini_service.KATEGORI_KONTEN),
         "suara": {g: list(v) for g, v in tts.VOICES.items()},
     }
+
+
+class RencanaRequest(BaseModel):
+    category: Literal["misteri", "teknologi", "scifi", "anomali"] = "anomali"
+    topic: str = Field(default="", max_length=300)
+    adegan: int = Field(default=6, ge=3, le=12)
+
+
+@app.post("/api/content/rencana")
+def content_rencana(req: RencanaRequest) -> dict[str, Any]:
+    """Naskah lengkap plus daftar gambar yang harus disiapkan, tanpa merender.
+
+    Dipakai saat belum ada gambar sama sekali: tentukan dulu ceritanya, baru
+    kumpulkan gambarnya satu per satu mengikuti daftar ini. Hasilnya disimpan
+    berdasarkan kategori dan topik, jadi membuka ulang rencana yang sama tidak
+    memakai kuota lagi.
+    """
+    if not GEMINI_API_KEY:
+        raise HTTPException(400, "GEMINI_API_KEY belum diisi di berkas .env")
+    kunci = "rencana:" + hashlib.sha256(
+        f"{req.category}|{req.topic.strip().lower()}|{req.adegan}".encode()
+    ).hexdigest()[:32]
+    tersimpan = db.cache_ambil(kunci)
+    if tersimpan:
+        return {**json.loads(tersimpan), "dari_simpanan": True}
+    try:
+        hasil = gemini_service.tulis_naskah_konten(
+            topik=req.topic, kategori=req.category,
+            kata=int(content_video.DURASI * content_video.KATA_PER_DETIK),
+            adegan=req.adegan,
+        )
+    except Exception as exc:  # noqa: BLE001 - pesan mentah tidak ramah
+        raise HTTPException(502, f"Gagal menulis rencana: {str(exc)[:150]}") from exc
+    db.cache_simpan(kunci, "rencana", json.dumps(hasil, ensure_ascii=False))
+    return {**hasil, "dari_simpanan": False}
 
 
 @app.post("/api/jobs/content")
