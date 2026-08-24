@@ -21,6 +21,7 @@ from pathlib import Path
 from ..config import ASSETS_DIR, DATA_DIR, OUTPUT_DIR, WORK_DIR
 from ..services import gemini as gemini_service
 from ..services import karaoke
+from ..services import tts as tts_service
 from ..tools import ensure_ffmpeg, ffprobe_duration, run_ffmpeg
 from .product_video import (
     FPS,
@@ -294,6 +295,42 @@ def run(job_id: str, params: dict, report, add_clip) -> str:
     return judul or "Video konten"
 
 
+def _narasi_gemini(naskah: str, work: Path, gender: str, voice: str,
+                   report) -> tuple[Path, list, str]:
+    """Narasi dengan suara Gemini, penanda katanya ditaksir per kalimat.
+
+    Satu permintaan kuota untuk seluruh narasi: `synth_many` mengirim semuanya
+    sekaligus lalu memotongnya di batas bicara. Tiap potongan diukur durasinya,
+    dan itu jadi jangkar pasti untuk awal-akhir tiap kalimat.
+    """
+    kalimat = karaoke.pecah_kalimat(naskah)
+    if not kalimat:
+        raise RuntimeError("Naskah tidak bisa dipecah jadi kalimat.")
+    stems = [work / f"kal-{i:02d}" for i in range(len(kalimat))]
+    meta: dict = {}
+    berkas = tts_service.synth_many(
+        list(zip(kalimat, stems)), gender=gender, voice_name=voice,
+        on_status=lambda m: report(10, m), meta=meta)
+
+    # Potongan disambung jadi satu, dan posisi sambungannya jadi jangkar waktu.
+    daftar = work / "narasi-list.txt"
+    daftar.write_text("".join(f"file '{b.as_posix()}'\n" for b in berkas),
+                      encoding="utf-8")
+    suara = work / "narasi.m4a"
+    run_ffmpeg(["-f", "concat", "-safe", "0", "-i", str(daftar),
+                "-c:a", "aac", "-b:a", "192k", "-ar", "44100", str(suara)])
+
+    kata: list = []
+    jalan = 0.0
+    for teks, b in zip(kalimat, berkas):
+        panjang = karaoke.durasi(b)
+        kata.extend(karaoke.taksir_kata(teks, jalan, jalan + panjang))
+        jalan += panjang
+    catatan = (f"{meta.get('provider', 'gemini')} suara {meta.get('voice', voice or '?')}"
+               f" - penanda kata ditaksir per kalimat (meleset ~0,1 detik)")
+    return suara, kata, catatan
+
+
 def buat(job_id: str, params: dict, report, add_clip) -> None:
     """Rangkai video konten 85 detik dari naskah dan gambar yang diunggah."""
     ensure_ffmpeg()
@@ -314,10 +351,18 @@ def buat(job_id: str, params: dict, report, add_clip) -> None:
     # dan keduanya harus sudah diketahui saat suaranya dibuat.
     rencana = rencanakan(gambar_masuk, rnd)
 
-    report(8, "Membuat narasi dan penanda kata...")
-    suara = work / "narasi.mp3"
-    kata = karaoke.narasi(naskah, suara, gender=str(params.get("gender") or "pria"),
-                          rate=rencana.rate, pitch=rencana.pitch)
+    mesin = str(params.get("engine") or "edge")
+    gender = str(params.get("gender") or "pria")
+    if mesin == "gemini":
+        report(8, "Membuat narasi dengan suara Gemini...")
+        suara, kata, catatan_suara = _narasi_gemini(
+            naskah, work, gender, str(params.get("voice") or ""), report)
+    else:
+        report(8, "Membuat narasi dan penanda kata...")
+        suara = work / "narasi.mp3"
+        kata = karaoke.narasi(naskah, suara, gender=gender,
+                              rate=rencana.rate, pitch=rencana.pitch)
+        catatan_suara = f"Edge TTS, tempo {rencana.rate}, nada {rencana.pitch}"
     panjang_narasi = karaoke.durasi(suara)
     if not kata:
         raise RuntimeError("Tidak ada penanda kata dari TTS.")
@@ -394,7 +439,7 @@ def buat(job_id: str, params: dict, report, add_clip) -> None:
         f"{rencana.gaya_sub['ukuran']}px, {rencana.gaya_sub['bawah']}px dari bawah\n"
         f"Transisi : {', '.join(rencana.transisi)}\n"
         f"Musik    : {rencana.bgm.name if rencana.bgm else 'tidak ada'}\n"
-        f"Suara    : tempo {rencana.rate}, nada {rencana.pitch}\n"
+        f"Suara    : {catatan_suara}\n"
         f"Enkode   : crf {rencana.crf}, brand {rencana.brand}, tanpa tanda pembuat\n"
         f"Tempo    : {tempo:.3f}x  (narasi asli {panjang_narasi:.1f} detik)\n"
         f"Scene    : {len(urutan)} gambar, "

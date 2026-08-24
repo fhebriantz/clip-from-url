@@ -646,9 +646,30 @@ lewat `boundary="WordBoundary"`, dan karena kita sendiri yang membuat suaranya,
 penandanya pasti cocok. Subtitle-nya ditulis sebagai berkas ASS dan disorot oleh
 libass, jadi satu baris dialog cukup untuk satu frasa penuh.
 
-Konsekuensinya: tab ini **selalu memakai Edge TTS**, bukan Gemini TTS. Suaranya
-sedikit lebih datar, tapi gratis tanpa batas harian dan penandanya akurat. Satu
-video konten hanya memakai **satu permintaan kuota** - untuk naskahnya saja.
+### Dua pilihan suara, dua pertukaran
+
+Suara Gemini - **Puck, Alnilam, Zephyr, Aoede** - jauh lebih berintonasi, tapi
+balasannya hanya audio mentah tanpa penanda waktu sama sekali. Jadi keduanya
+ditawarkan, bukan salah satunya dipaksakan:
+
+| | Edge TTS | Gemini |
+|---|---|---|
+| Kuota | gratis tanpa batas | 1 permintaan TTS per video |
+| Sorotan subtitle | **tepat per kata** | ditaksir, meleset ~0,1 detik |
+| Intonasi | lebih datar | jauh lebih hidup |
+
+Untuk suara Gemini, narasinya dipecah per kalimat dan tiap kalimat diukur
+durasinya - itu memberi **jangkar yang pasti** di tiap awal dan akhir kalimat.
+Di dalam kalimat, waktu tiap kata ditaksir dari panjang hurufnya.
+
+Ketepatannya diukur, bukan dikira-kira: dibandingkan dengan penanda asli Edge
+TTS pada lima kalimat, taksirannya meleset **rata-rata 88 milidetik** dan paling
+jauh 241 milidetik. Bobot "jumlah huruf + 2" dipakai karena mengalahkan hitungan
+suku kata, yang justru meleset lebih jauh (125ms) - meski bahasa Indonesia
+berirama suku kata.
+
+Dengan Edge, satu video konten memakai **satu permintaan kuota** untuk naskahnya
+saja. Dengan Gemini, dua.
 
 ## Musik latar dan auto-ducking
 

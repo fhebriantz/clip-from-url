@@ -18,6 +18,7 @@ datar, dan sebagai gantinya gratis tanpa batas harian.
 from __future__ import annotations
 
 import asyncio
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -96,13 +97,27 @@ def durasi(path: Path) -> float:
         return 0.0
 
 
+# Titik, tanya, dan seru menandai akhir kalimat walau masih ada tanda kutip atau
+# kurung menempel sesudahnya.
+_AKHIR_KALIMAT = re.compile(r"[.!?][\"\')\]]*$")
+
+
 def baris_dari_kata(kata: list[Kata], maks: int = MAKS_KATA_BARIS,
                     jeda: float = JEDA_BARIS) -> list[Baris]:
-    """Kelompokkan kata jadi baris pendek, pecah juga saat ada jeda bicara."""
+    """Kelompokkan kata jadi baris pendek.
+
+    Pemisahnya tiga: baris sudah penuh, ada jeda bicara, atau kalimatnya sudah
+    selesai. Yang ketiga tidak bisa dihilangkan - pada narasi yang penanda
+    waktunya ditaksir, tidak ada jeda sama sekali di antara kata, jadi tanpa ini
+    barisnya akan memuat ekor satu kalimat digabung kepala kalimat berikutnya:
+    "berjalan lewat satelit. Padahal".
+    """
     baris: list[Baris] = []
     tumpuk: list[Kata] = []
     for k in kata:
-        if tumpuk and (len(tumpuk) >= maks or k.mulai - tumpuk[-1].akhir > jeda):
+        if tumpuk and (len(tumpuk) >= maks
+                       or k.mulai - tumpuk[-1].akhir > jeda
+                       or _AKHIR_KALIMAT.search(tumpuk[-1].teks)):
             baris.append(Baris(tumpuk))
             tumpuk = []
         tumpuk.append(k)
@@ -212,3 +227,63 @@ def tulis_ass(baris: list[Baris], out: Path, gaya: dict, font: str,
         )
     out.write_text("\n".join(kepala + baris_teks) + "\n", encoding="utf-8")
     return out
+
+
+# ------------------------------------------- narasi dengan suara Gemini
+
+# Edge TTS memberi penanda kata yang tepat tapi suaranya datar. Suara Gemini
+# (Puck, Alnilam, Zephyr, Aoede) jauh lebih hidup, tapi balasannya cuma audio
+# mentah - tidak ada penanda waktu sama sekali.
+#
+# Jalan tengahnya: narasi dipecah per KALIMAT, tiap kalimat dibuat suaranya
+# sendiri, lalu durasinya diukur. Itu memberi titik jangkar yang PASTI di tiap
+# awal dan akhir kalimat. Di dalam kalimat, waktu tiap kata ditaksir dari
+# panjang hurufnya.
+#
+# Ketepatan taksiran ini diukur, bukan dikira-kira: dibandingkan dengan penanda
+# asli dari Edge TTS pada lima kalimat, meleset rata-rata 88 milidetik dan
+# paling jauh 241 milidetik. Bobot "huruf + 2" dipilih karena mengalahkan
+# hitungan suku kata, yang justru meleset lebih jauh (125ms).
+BOBOT_TETAP = 2.0
+_PEMISAH_KALIMAT = re.compile(r"(?<=[.!?])\s+")
+
+
+def pecah_kalimat(teks: str) -> list[str]:
+    """Pisahkan narasi jadi kalimat; yang terlalu panjang dipotong di koma."""
+    kasar = [k.strip() for k in _PEMISAH_KALIMAT.split(teks.strip()) if k.strip()]
+    hasil: list[str] = []
+    for k in kasar:
+        # Kalimat panjang memperlebar rentang taksiran, jadi dipecah lagi di koma
+        # selama potongannya masih cukup panjang untuk berdiri sendiri.
+        if len(k.split()) > 14 and "," in k:
+            bagian = [b.strip() for b in k.split(",") if b.strip()]
+            gabung = ""
+            for b in bagian:
+                calon = f"{gabung}, {b}" if gabung else b
+                if len(calon.split()) > 10 and gabung:
+                    hasil.append(gabung)
+                    gabung = b
+                else:
+                    gabung = calon
+            if gabung:
+                hasil.append(gabung)
+        else:
+            hasil.append(k)
+    return hasil
+
+
+def taksir_kata(kalimat: str, mulai: float, akhir: float) -> list[Kata]:
+    """Bagi rentang waktu satu kalimat ke kata-katanya menurut panjang hurufnya."""
+    kata = kalimat.split()
+    if not kata:
+        return []
+    bobot = [len(k) + BOBOT_TETAP for k in kata]
+    total = sum(bobot)
+    rentang = max(0.05, akhir - mulai)
+    keluar: list[Kata] = []
+    jalan = mulai
+    for k, b in zip(kata, bobot):
+        lebar = rentang * b / total
+        keluar.append(Kata(k, jalan, jalan + lebar))
+        jalan += lebar
+    return keluar

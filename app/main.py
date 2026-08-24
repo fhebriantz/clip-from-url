@@ -221,12 +221,19 @@ class ContentRequest(BaseModel):
     script: str = Field(default="", max_length=8000)
     title: str = Field(default="", max_length=200)
     gender: Literal["pria", "wanita"] = "pria"
+    # Edge gratis tanpa batas dan penanda katanya tepat; Gemini terdengar jauh
+    # lebih hidup tapi memakai kuota TTS dan penandanya ditaksir.
+    engine: Literal["edge", "gemini"] = "edge"
+    voice: str = Field(default="", max_length=40)
     assets: list[AssetRef] = Field(default_factory=list)
 
 
 @app.get("/api/content/kategori")
-def content_kategori() -> dict[str, str]:
-    return dict(gemini_service.KATEGORI_KONTEN)
+def content_kategori() -> dict[str, Any]:
+    return {
+        "kategori": dict(gemini_service.KATEGORI_KONTEN),
+        "suara": {g: list(v) for g, v in tts.VOICES.items()},
+    }
 
 
 @app.post("/api/jobs/content")
@@ -248,6 +255,8 @@ def create_content(req: ContentRequest) -> dict[str, str]:
             "script": req.script,
             "title": req.title,
             "gender": req.gender,
+            "engine": req.engine,
+            "voice": req.voice,
             "images": gambar,
         },
     )

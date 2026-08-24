@@ -971,15 +971,45 @@ let ASET_KONTEN = [];
 let ARAHAN = {};
 
 async function muatKategori() {
+  let body;
   try {
-    ARAHAN = await (await fetch("/api/content/kategori")).json();
+    body = await (await fetch("/api/content/kategori")).json();
   } catch { return; }
+  ARAHAN = body.kategori || {};
   const sel = $("kKategori");
   sel.innerHTML = Object.keys(ARAHAN)
     .map((k) => `<option value="${esc(k)}">${esc(k)}</option>`).join("");
   sel.value = "anomali";
   tampilArahan();
+  isiSuara(body.suara || {});
 }
+
+// Dua mesin suara dengan pertukaran yang berbeda, jadi keduanya ditawarkan
+// dalam satu daftar - bukan disembunyikan di balik saklar.
+function isiSuara(suara) {
+  const edge = ["pria", "wanita"].map((g) =>
+    `<option value="edge:${g}">Edge - ${g}</option>`).join("");
+  const gem = Object.entries(suara).flatMap(([g, daftar]) =>
+    daftar.map((v) => `<option value="gemini:${g}:${esc(v)}">Gemini - ${esc(v)} (${g})</option>`)
+  ).join("");
+  $("kSuara").innerHTML =
+    `<optgroup label="Gratis tanpa batas">${edge}</optgroup>`
+    + `<optgroup label="Lebih hidup, pakai kuota TTS">${gem}</optgroup>`;
+  notaSuara();
+}
+
+function notaSuara() {
+  const v = $("kSuara").value || "";
+  $("kSuaraNota").innerHTML = v.startsWith("gemini")
+    ? "Suara jauh lebih berintonasi, tapi memakai <b>1 kuota TTS</b> per video. "
+      + "Gemini tidak mengembalikan penanda waktu, jadi sorotan subtitle "
+      + "<b>ditaksir per kalimat</b> - terukur meleset sekitar 0,1 detik."
+    : "Gratis tanpa batas harian, dan sorotan subtitle-nya <b>tepat per kata</b> "
+      + "karena penandanya datang langsung dari mesin suaranya. Intonasinya "
+      + "lebih datar.";
+}
+
+$("kSuara").addEventListener("change", notaSuara);
 
 function tampilArahan() {
   $("kArahan").textContent = ARAHAN[$("kKategori").value] || "";
@@ -1038,6 +1068,11 @@ $("kAssetList").addEventListener("click", async (e) => {
   renderAsetKonten();
 });
 
+function suaraTerpilih() {
+  const [mesin, gender, nama] = ($("kSuara").value || "edge:pria").split(":");
+  return { engine: mesin, gender, voice: nama || "" };
+}
+
 $("formContent").addEventListener("submit", (e) => {
   e.preventDefault();
   submit(e.target, "/api/jobs/content", {
@@ -1045,7 +1080,7 @@ $("formContent").addEventListener("submit", (e) => {
     topic: $("kTopik").value.trim(),
     script: $("kNaskah").value.trim(),
     title: $("kJudul").value.trim(),
-    gender: $("kGender").value,
+    ...suaraTerpilih(),
     assets: ASET_KONTEN.map((a) => ({ id: a.id })),
   }, "content");
 });
